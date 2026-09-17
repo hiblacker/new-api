@@ -26,6 +26,9 @@ beforeAll(async () => {
   await i18next.use(initReactI18next).init({
     lng: 'en',
     fallbackLng: 'en',
+    // Mirrors src/i18n/config.ts: labels such as "Total:" or "Granularity:"
+    // must stay whole keys instead of being split into a namespace.
+    nsSeparator: false,
     resources: {
       en: {
         translation: {},
