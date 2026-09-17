@@ -6142,6 +6142,21 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Token Usage": "Token 用量",
+    "Tokens used": "已使用 Token",
+    "Last 24 hours": "近 24 小时",
+    "All-time token usage": "全部时间 Token 用量",
+    "Monitor token usage and request volume": "监控 Token 用量和请求量",
+    "Token Usage by Model": "各模型 Token 用量",
+    "90 Days": "90 天",
+    "All Time": "全部",
+    "Token Usage Filters": "Token 用量筛选",
+    "Choose the time range and how usage is aggregated into buckets.": "选择时间范围，以及用量按什么粒度聚合。",
+    "Per Hour": "小时",
+    "Per Day": "天",
+    "Per Week": "周",
+    "Per Month": "月",
+    "Granularity:": "粒度："
   }
 }

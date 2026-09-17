@@ -75,6 +75,7 @@ For commercial licensing, please contact support@quantumnous.com
   --color-overview-accent-1: var(--overview-accent-1);
   --color-overview-accent-2: var(--overview-accent-2);
   --color-overview-accent-3: var(--overview-accent-3);
+  --color-overview-accent-4: var(--overview-accent-4);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -138,6 +139,7 @@ For commercial licensing, please contact support@quantumnous.com
   --overview-accent-1: oklch(0.72 0.18 250);
   --overview-accent-2: oklch(0.65 0.15 200);
   --overview-accent-3: oklch(0.7 0.12 280);
+  --overview-accent-4: oklch(0.68 0.19 325);
   --sidebar: color-mix(in oklch, var(--foreground) 0.5%, var(--background));
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.64 0.197 253.892);

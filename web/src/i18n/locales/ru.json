@@ -6142,6 +6142,21 @@
     "Zero retention": "Без хранения данных",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Token Usage": "Использование токенов",
+    "Tokens used": "Использовано токенов",
+    "Last 24 hours": "Последние 24 часа",
+    "All-time token usage": "Использование токенов за всё время",
+    "Monitor token usage and request volume": "Отслеживайте использование токенов и объём запросов",
+    "Token Usage by Model": "Использование токенов по моделям",
+    "90 Days": "90 дней",
+    "All Time": "За всё время",
+    "Token Usage Filters": "Фильтры использования токенов",
+    "Choose the time range and how usage is aggregated into buckets.": "Выберите период и гранулярность агрегации.",
+    "Per Hour": "По часам",
+    "Per Day": "По дням",
+    "Per Week": "По неделям",
+    "Per Month": "По месяцам",
+    "Granularity:": "Гранулярность:"
   }
 }

@@ -6142,6 +6142,21 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Token Usage": "Utilisation de jetons",
+    "Tokens used": "Jetons utilisés",
+    "Last 24 hours": "Dernières 24 heures",
+    "All-time token usage": "Utilisation totale des jetons",
+    "Monitor token usage and request volume": "Surveillez la consommation de jetons et le volume de requêtes",
+    "Token Usage by Model": "Utilisation de jetons par modèle",
+    "90 Days": "90 jours",
+    "All Time": "Tout",
+    "Token Usage Filters": "Filtres d’utilisation de jetons",
+    "Choose the time range and how usage is aggregated into buckets.": "Choisissez la période et la granularité d’agrégation.",
+    "Per Hour": "Par heure",
+    "Per Day": "Par jour",
+    "Per Week": "Par semaine",
+    "Per Month": "Par mois",
+    "Granularity:": "Granularité :"
   }
 }

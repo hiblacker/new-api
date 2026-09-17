@@ -22,7 +22,7 @@ import {
   Layers,
   Gauge,
   Zap,
-  Flame,
+  Sigma,
   TrendingUp,
   Activity,
   type LucideIcon,
@@ -91,9 +91,11 @@ export function useModelStatCardsConfig(): StatCardConfig[] {
 }
 
 export function useSummaryCardsConfig(totals: {
-  todayUsageDisplay: string
+  windowTokenDisplay: string
+  windowLabel: string
   usedDisplay: string
   requestCountDisplay: string
+  lifetimeTokenDisplay: string
   currencyLabel: string
   currencyEnabled: boolean
 }) {
@@ -101,13 +103,11 @@ export function useSummaryCardsConfig(totals: {
 
   return [
     {
-      key: 'todayUsage',
-      title: t('Last 24h usage'),
-      value: totals.todayUsageDisplay,
-      description: totals.currencyEnabled
-        ? `${t('Consumed in the last 24 hours')} (${totals.currencyLabel})`
-        : t('Consumed in the last 24 hours'),
-      icon: Flame,
+      key: 'windowTokens',
+      title: t('Token Usage'),
+      value: totals.windowTokenDisplay,
+      description: `${t('Tokens used')} · ${totals.windowLabel}`,
+      icon: Layers,
     },
     {
       key: 'usage',
@@ -124,6 +124,13 @@ export function useSummaryCardsConfig(totals: {
       value: totals.requestCountDisplay,
       description: t('Total requests made'),
       icon: Activity,
+    },
+    {
+      key: 'lifetimeTokens',
+      title: t('Total Tokens'),
+      value: totals.lifetimeTokenDisplay,
+      description: t('All-time token usage'),
+      icon: Sigma,
     },
   ]
 }

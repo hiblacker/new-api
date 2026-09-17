@@ -37,7 +37,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
-import { useId, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -48,6 +48,7 @@ import {
 } from '@/components/page-transition'
 import { Button } from '@/components/ui/button'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { fetchTokenKey, getApiKeys } from '@/features/keys/api'
 import type { ApiKey } from '@/features/keys/types'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
@@ -67,6 +68,25 @@ import { FAQPanel } from './faq-panel'
 import { PerformanceHealthPanel } from './performance-health-panel'
 import { SummaryCards } from './summary-cards'
 import { UptimePanel } from './uptime-panel'
+
+const LazyTokenUsageChart = lazy(() =>
+  import('./token-usage-chart').then((m) => ({
+    default: m.TokenUsageChart,
+  }))
+)
+
+function TokenUsageChartFallback() {
+  return (
+    <div className='bg-card overflow-hidden rounded-2xl border shadow-xs'>
+      <div className='border-b px-3 py-2.5 sm:px-5 sm:py-3'>
+        <Skeleton className='h-5 w-40' />
+      </div>
+      <div className='p-1.5 sm:p-2'>
+        <Skeleton className='h-[320px] w-full sm:h-80' />
+      </div>
+    </div>
+  )
+}
 
 const SETUP_GUIDE_VISIBILITY_STORAGE_KEY =
   'dashboard_overview_setup_guide_expanded'
@@ -784,6 +804,10 @@ export function OverviewDashboard() {
           )}
 
           <SummaryCards />
+
+          <Suspense fallback={<TokenUsageChartFallback />}>
+            <LazyTokenUsageChart />
+          </Suspense>
 
           {showContentPanels && (
             <CardStaggerContainer

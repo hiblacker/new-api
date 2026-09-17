@@ -23,7 +23,7 @@ import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
-type StatCardTone = 'accent-1' | 'accent-2' | 'accent-3'
+type StatCardTone = 'accent-1' | 'accent-2' | 'accent-3' | 'accent-4'
 type StatCardSparklineVariant = 'bars' | 'line'
 type StatCardDetailTone =
   | 'default'
@@ -61,18 +61,22 @@ const TONE_CLASSES: Record<StatCardTone, string> = {
     'from-overview-accent-2/80 via-overview-accent-2/45 to-overview-accent-2/5 dark:from-overview-accent-2/70 dark:via-overview-accent-2/30',
   'accent-3':
     'from-overview-accent-3/80 via-overview-accent-3/45 to-overview-accent-3/5 dark:from-overview-accent-3/70 dark:via-overview-accent-3/30',
+  'accent-4':
+    'from-overview-accent-4/80 via-overview-accent-4/45 to-overview-accent-4/5 dark:from-overview-accent-4/70 dark:via-overview-accent-4/30',
 }
 
 const LINE_TONE_CLASSES: Record<StatCardTone, string> = {
   'accent-1': 'text-overview-accent-1',
   'accent-2': 'text-overview-accent-2',
   'accent-3': 'text-overview-accent-3',
+  'accent-4': 'text-overview-accent-4',
 }
 
 const ICON_TONE_BY_STAT_TONE: Record<StatCardTone, IconBadgeTone> = {
   'accent-1': 'chart-1',
   'accent-2': 'chart-2',
   'accent-3': 'chart-3',
+  'accent-4': 'chart-4',
 }
 
 const DETAIL_TONE_CLASSES: Record<StatCardDetailTone, string> = {
@@ -305,11 +309,12 @@ export function StatCard(props: StatCardProps) {
       )}
     >
       <div className='flex items-start justify-between gap-1'>
-        <div className='text-muted-foreground flex items-center gap-1 text-[11px] font-medium sm:gap-2 sm:text-xs'>
+        <div className='text-muted-foreground flex min-w-0 items-center gap-1 text-[11px] font-medium sm:gap-2 sm:text-xs'>
           <IconBadge
             tone={iconTone}
             size='stat'
             className={cn(
+              'shrink-0',
               props.compactMobile &&
                 'size-4 rounded-sm [&>svg]:size-2.5 sm:size-7 sm:rounded-md sm:[&>svg]:size-3.5'
             )}

@@ -6142,6 +6142,21 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Token Usage": "Lượng token sử dụng",
+    "Tokens used": "Token đã dùng",
+    "Last 24 hours": "24 giờ qua",
+    "All-time token usage": "Tổng lượng token đã dùng",
+    "Monitor token usage and request volume": "Theo dõi lượng token sử dụng và số lượng yêu cầu",
+    "Token Usage by Model": "Lượng token theo mô hình",
+    "90 Days": "90 ngày",
+    "All Time": "Tất cả",
+    "Token Usage Filters": "Bộ lọc lượng token",
+    "Choose the time range and how usage is aggregated into buckets.": "Chọn khoảng thời gian và cách tổng hợp dữ liệu.",
+    "Per Hour": "Theo giờ",
+    "Per Day": "Theo ngày",
+    "Per Week": "Theo tuần",
+    "Per Month": "Theo tháng",
+    "Granularity:": "Độ chi tiết:"
   }
 }

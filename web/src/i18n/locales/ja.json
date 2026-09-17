@@ -6142,6 +6142,21 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Token Usage": "トークン使用量",
+    "Tokens used": "使用トークン数",
+    "Last 24 hours": "過去24時間",
+    "All-time token usage": "全期間のトークン使用量",
+    "Monitor token usage and request volume": "トークン使用量とリクエスト数を監視",
+    "Token Usage by Model": "モデル別トークン使用量",
+    "90 Days": "90日",
+    "All Time": "全期間",
+    "Token Usage Filters": "トークン使用量フィルター",
+    "Choose the time range and how usage is aggregated into buckets.": "期間と、使用量を集計する粒度を選択します。",
+    "Per Hour": "時間",
+    "Per Day": "日",
+    "Per Week": "週",
+    "Per Month": "月",
+    "Granularity:": "粒度:"
   }
 }

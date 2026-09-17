@@ -6142,6 +6142,21 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Token Usage": "Token Usage",
+    "Tokens used": "Tokens used",
+    "Last 24 hours": "Last 24 hours",
+    "All-time token usage": "All-time token usage",
+    "Monitor token usage and request volume": "Monitor token usage and request volume",
+    "Token Usage by Model": "Token Usage by Model",
+    "90 Days": "90 Days",
+    "All Time": "All Time",
+    "Token Usage Filters": "Token Usage Filters",
+    "Choose the time range and how usage is aggregated into buckets.": "Choose the time range and how usage is aggregated into buckets.",
+    "Per Hour": "Per Hour",
+    "Per Day": "Per Day",
+    "Per Week": "Per Week",
+    "Per Month": "Per Month",
+    "Granularity:": "Granularity:"
   }
 }
