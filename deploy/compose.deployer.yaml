@@ -1,0 +1,36 @@
+# new-api · NAS 部署守望容器
+#
+# 用途：替代 cron，让 NAS 能在**不需要 root SSH、不需要 NOPASSWD**的前提下执行部署。
+#
+# 一次性操作（在 NAS 上，通过 Container Manager 界面）：
+#   把这个文件放到 /volume1/docker/new-apiv1/deploy/ 下，然后：
+#     cd /volume1/docker/new-apiv1/deploy
+#     docker compose -f compose.deployer.yaml up -d
+#   或者用 DSM「Container Manager → 项目 → 新增」，指向本文件。
+#
+# 之后外部只需把镜像和 request.json 写进 staging/，本容器会自动执行部署。
+#
+# 关键设计点：
+#   · 挂载 docker.sock —— 所以它拥有 docker 权限（容器以 root 运行）
+#   · 目录**挂到完全相同的路径** —— 否则 compose.yaml 里的相对 bind mount
+#     （./postgres、./data）会被解析成容器内路径，导致挂载错目录
+version: "3.8"
+
+services:
+  newapi-deployer:
+    # 与 NAS 上的 Docker daemon（24.0.2）版本对齐；该镜像自带 compose 插件
+    image: docker.m.daocloud.io/library/docker:24.0.2-cli
+    container_name: newapi-deployer
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # ★ 必须同路径挂载，见上方说明
+      - /volume1/docker/new-apiv1:/volume1/docker/new-apiv1
+    command: ["/bin/sh", "/volume1/docker/new-apiv1/deploy/watcher.sh"]
+    environment:
+      - TZ=Asia/Shanghai
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

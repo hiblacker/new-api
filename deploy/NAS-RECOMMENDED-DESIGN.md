@@ -289,32 +289,60 @@ mv -f "$PROC" "$STAGING/request.done"
 
 ---
 
-## 6. 触发器：`/etc/cron.d/newapi-deploy`
+## 6. 触发器：常驻守望容器（**不使用 cron**）
 
+原方案用 `/etc/cron.d` 轮询，但有三个缺点：要 root 写 `/etc`、DSM 更新可能重置、
+调度逻辑散在系统里。改为**一个常驻容器**：
+
+```yaml
+# deploy/compose.deployer.yaml
+services:
+  newapi-deployer:
+    image: docker.m.daocloud.io/library/docker:24.0.2-cli   # 与 NAS daemon 版本对齐，自带 compose 插件
+    container_name: newapi-deployer
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # ★ 必须挂到【完全相同的路径】，否则 compose.yaml 里的 ./postgres 等
+      #   相对 bind mount 会被解析成容器内路径，挂载错目录
+      - /volume1/docker/new-apiv1:/volume1/docker/new-apiv1
+    command: ["/bin/sh", "/volume1/docker/new-apiv1/deploy/watcher.sh"]
 ```
-# /etc/cron.d/newapi-deploy
-# 群晖 crontab 格式比标准多一个 who 列
-*/2 * * * *  root  /volume1/docker/new-apiv1/deploy/runner.sh
+
+`watcher.sh` 就是一个 `while true; sleep 5` 循环，检查 `staging/request.json`
+存在就调用 `runner.sh`。
+
+### 为什么这比 cron 好（针对你的约束）
+
+| | cron | 守望容器 |
+|---|---|---|
+| 需要写 `/etc` | ✅ 需要（root，DSM 更新可能重置） | ❌ 不需要 |
+| 启动方式 | SSH root 或计划任务 | **Container Manager 界面点一下** |
+| 开机自启 | 靠 DSM 的 cron 机制 | `restart: unless-stopped` |
+| 查看状态 | `ps`/日志文件 | DSM 界面直接看容器状态与日志 |
+| 与现有部署的关系 | 系统级 | 与 new-api 并列的一个容器 |
+
+**实测确认**：`docker:24.0.2-cli` 镜像**自带 compose v2.19.1**，
+无需额外安装或挂载插件。
+
+### 一个必须处理的正确性问题
+
+原部署的 **compose 项目名未知**（`compose.yaml` 没有 `-p`，容器名也不含项目前缀）。
+如果 `runner.sh` 用错项目名，compose 会当成**新项目**，创建重复容器并抢占 53130 端口。
+
+因此 `runner.sh` 会**从运行中的容器反查项目名**：
+
+```sh
+proj="$(docker inspect "$(service_container new-api)" \
+        --format '{{index .Config.Labels "com.docker.compose.project"}}')"
 ```
 
-**为什么用 `cron.d` 而不是 DSM 计划任务界面**：实测群晖计划任务界面的调度粒度是
-天/周/月，做不到「每 2 分钟」；而 `/etc/cron.d` 存在且支持标准 cron 表达式。
+并原样沿用，确保操作的是同一个 stack。
 
-**DSM 更新可能重置 `/etc`** → 用一个 **开机触发的 DSM 计划任务**重新安装这个文件：
+### 低延迟（可选）
 
-```bash
-# DSM 计划任务 → 触发的任务 → 开机 → 用户 root
-echo '*/2 * * * *  root  /volume1/docker/new-apiv1/deploy/runner.sh' \
-  > /etc/cron.d/newapi-deploy && chmod 644 /etc/cron.d/newapi-deploy
-```
-
-这样即使 `/etc` 被重置，重启后也会自动恢复。**这个开机任务本身就是你用 DSM 界面
-创建的那一个 root 任务** —— 只用于安装 cron 文件，内容固定、不可注入。
-
-> **低延迟替代**：`synoschedtask --run id=<ID>` 可按需触发，把延迟从 2 分钟降到秒级。
-> 但见 §8 的安全说明——它同时也是一个提权面，**默认不启用**。
-
----
+轮询周期可调到 2 秒。若需要「推送即部署」，可用
+`synoschedtask --run`，但它同时是一个提权面（见 §8.2），**默认不启用**。
 
 ## 7. 端到端时序
 
@@ -437,7 +465,7 @@ echo '*/2 * * * *  root  /volume1/docker/new-apiv1/deploy/runner.sh' \
 |---|---|---|---|
 | **P0** | 改 `compose.yaml` 的 image 行为 `${NEWAPI_IMAGE:-...}` | 改 1 行 | 版本可切换 |
 | **P1** | 在 NAS 建目录与权限，放 `runner.sh` | 一次 root（DSM 界面建 root 任务即可） | 特权脚本就位 |
-| **P2** | 安装 `/etc/cron.d/newapi-deploy` + 开机恢复任务 | DSM 界面建开机任务 | 轮询生效 |
+| **P2** | 部署守望容器（`compose.deployer.yaml`） | Container Manager 界面点一下 | 自动部署生效 |
 | **P3** | 改造 `deploy/nas.sh`（§10） | 我改 | 一键 `push` / `rollback` |
 | **P4** | 首次真跑：备份 → 部署 → 验证 → 回滚演练 | 观察 | 链路打通 |
 | **P5**（可选） | 接入 GitHub Actions | 配 Secret | push tag 即部署 |
