@@ -114,7 +114,7 @@ func GetLogsStat(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	//tokenNum := model.SumUsedToken(logType, startTimestamp, endTimestamp, modelName, username, "")
+	tokenNum := model.SumUsedToken(logType, startTimestamp, endTimestamp, modelName, username, tokenName)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -122,6 +122,7 @@ func GetLogsStat(c *gin.Context) {
 			"quota": stat.Quota,
 			"rpm":   stat.Rpm,
 			"tpm":   stat.Tpm,
+			"token": tokenNum,
 		},
 	})
 	return
@@ -141,7 +142,7 @@ func GetLogsSelfStat(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	//tokenNum := model.SumUsedToken(logType, startTimestamp, endTimestamp, modelName, username, tokenName)
+	tokenNum := model.SumUsedToken(logType, startTimestamp, endTimestamp, modelName, username, tokenName)
 	c.JSON(200, gin.H{
 		"success": true,
 		"message": "",
@@ -149,7 +150,7 @@ func GetLogsSelfStat(c *gin.Context) {
 			"quota": quotaNum.Quota,
 			"rpm":   quotaNum.Rpm,
 			"tpm":   quotaNum.Tpm,
-			//"token": tokenNum,
+			"token": tokenNum,
 		},
 	})
 	return
