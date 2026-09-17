@@ -467,3 +467,125 @@ echo '*/2 * * * *  root  /volume1/docker/new-apiv1/deploy/runner.sh' \
 > **构建在外部，投递用文件，执行在 NAS 的固定脚本里，提权靠 root cron。**
 > 每一步都能追到一条实测约束；每一处特权都被收进一个不接受参数的脚本；
 > 部署前必先备份，失败自动回滚，且**永远不碰数据卷**。
+
+
+---
+
+## 14. 变体：如果自建 Git 服务呢？
+
+### 14.1 先问一个问题：部署链路需要源码吗？
+
+**不需要。** 推荐设计里，NAS 收到的只有**构建好的镜像**，
+它从头到尾没有 `git clone`、没有 `docker build`。
+
+所以：**自建 Git 服务不会改善部署链路。** 它的价值在别处（见 14.4）。
+
+### 14.2 三种自建形态
+
+#### 形态 A：NAS 存源码 + NAS 本地构建（自洽闭环）
+
+```
+你 git push nas → Gitea → runner/cron → NAS 上 docker build → compose up -d
+```
+
+| 优点 | 缺点 |
+|---|---|
+| 完全不依赖 GitHub | 构建在 **4 核** NAS 上跑 Go+前端：**10–30 分钟** |
+| 源码与镜像都在自己手里 | runner 需要 docker 权限（**= root**） |
+| | 依赖镜像源可用性（实测 3/9 可用，会变） |
+| | 引擎 **24.0.2**，上游 2024-06 起不维护 |
+
+**结论**：能跑，但**不划算**——你的工作站构建一次只要 1–2 分钟。
+
+#### 形态 B：Git + 本地 Registry 作为**交付通道**（若自建，推荐这个形态）
+
+```
+工作站 build → docker push  nas:5010/new-api:vX-custom.N
+                                  ↓
+            NAS 从【本地 registry】拉取 → runner 部署
+```
+
+| 优点 | 缺点 |
+|---|---|
+| **完全不依赖外部网络**（连镜像源都不需要） | 需配 `insecure-registries`（HTTP registry 必须） |
+| 原生多 tag → 回滚到任意历史版本 | 改 `dockerd.json` + **重启 docker daemon**（需 root） |
+| 层复用，增量传输 | 多一个常驻容器 |
+| | 多一个要备份/升级的服务 |
+
+#### 形态 C：完整 Gitea + Actions Runner
+
+最重。runner 需要 docker 权限，构建仍在 NAS 上（慢），
+且官方建议自托管 runner **不要用于公开仓库**。
+**结论：过度工程。**
+
+### 14.3 关键反驳：`docker load` 已经把「多版本回滚」免费给你了
+
+这一点很多人会忽略：
+
+> `docker load` 会把镜像**永久写进 NAS 本地镜像库**（直到被 prune）。
+
+也就是说：
+
+- 每部署一个版本，NAS 上就多一个镜像 tag → **回滚到任意历史版本天然可行**
+- 不需要 registry 来保存历史版本
+- 我们的 runner 只额外打一个 `rollback` tag，但完全可以保留 `vX-custom.1/2/3/...`
+
+**registry 相对 `save | scp | load` 的核心增量，主要是**：
+
+| | save/load | 本地 registry |
+|---|---|---|
+| 多版本回滚 | ✅ 已有 | ✅ |
+| 增量传输（只传变化层） | ❌ 每次全量 ~150–200MB | ✅ |
+| 配置成本 | **零** | 需 insecure-registries + 常驻容器 |
+| 局域网耗时 | 几秒~几十秒 | 更快 |
+
+**结论**：对「偶尔发版」的场景，`save/load` 的零配置优势大于 registry 的增量优势。
+
+### 14.4 那自建 Git 真正值得的理由是什么？
+
+不是部署，而是这三条：
+
+1. **代码自主可控** —— 不再只存在 GitHub（你的 NAS 连不上 GitHub，但工作站能）
+2. **异地备份** —— Gitea 可以作为 GitHub 仓库的**镜像目标**，定时同步
+3. **事件驱动触发** —— Gitea webhook 可以替代 cron 轮询，把部署延迟从 2 分钟降到秒级
+
+### 14.5 若确实要自建，我会怎么调整架构
+
+**保持权限边界不变**是最重要的：
+
+```
+你 push tag → Gitea webhook ──► 非特权小接收器（以 hiblacker 运行）
+                                        │  只做一件事：
+                                        │  写 staging/request.json
+                                        ▼
+                                 root runner（cron）照常执行
+```
+
+要点：
+- **绝不让 webhook 接收器直接拥有 docker 权限** —— 它只写一个文件
+- 选型建议 **Forgejo**（Gitea 的社区 fork，许可证更干净）或 Gitea
+- 端口避开 `5000 / 5001 / 53130`，例如 `3010`(web) + `2222`(SSH)
+- **只用它的 Git 仓库**（+ 可选的内置 registry），**不要用 Actions**
+- Gitea 自身也要纳入备份（仓库 + 数据库）
+
+### 14.6 更轻的替代方案
+
+如果真实诉求只是其中一条，不必上 Gitea：
+
+| 诉求 | 更轻的做法 |
+|---|---|
+| 只要一个本地 registry | 单跑 `registry:2` 容器（几十 MB），不需要 Gitea |
+| 只要代码异地备份 | Gitea/Forgejo 当**镜像目标**；或群晖自带 **Git Server** 包（很轻，无 UI/registry） |
+| 只要事件触发 | 一个 20 行的接收器（只写 `request.json`），或先继续用 cron 轮询 |
+
+### 14.7 建议
+
+> **不要为了部署而自建 Git。**
+> 推荐设计里 NAS 不需要源码；`docker load` 已经免费提供了多版本回滚。
+>
+> **如果你的动机是「代码不想只依赖 GitHub」，那自建 Gitea/Forgejo 是合理的**——
+> 但请把它定位成**代码托管与镜像备份**，而不是部署流水线的一部分。
+>
+> **若两者都想要**，采用形态 B：自建 Git + 本地 registry，
+> 但**绝不用它的 Actions**，部署仍走本设计的 root runner，
+> 权限边界保持不变（webhook 只写文件）。
