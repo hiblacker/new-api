@@ -87,7 +87,7 @@
 |---|---|---|---|---|---|---|
 | **A. CI 构建 + SSH 直传** | GitHub 托管机 | push tag | NOPASSWD 或计划任务 | **零依赖** ✅ | 好 | 低 |
 | **B. CI 构建 + GHCR 拉取** | GitHub 托管机 | webhook / 轮询 | 同上 | ghcr.io（**实测不可靠**）⚠️ | 好 | 中 |
-| **C. NAS 本地构建** | NAS 自己 | 计划任务轮询 | **不需要**（root 任务） | Docker Hub（**实测不可达**）❌ | 好 | 中 |
+| **C. NAS 本地构建** | NAS 自己 | 计划任务轮询 | **不需要**（root 任务） | 走 daocloud 镜像源 ✅（实测 3/9 可用） | 好 | 中 |
 | **D. 自建 Gitea + Runner** | NAS 自己 | push | 需 docker 访问 | Docker Hub ❌ + 需自建 Gitea | 好 | 高 |
 | **E. Portainer API/Webhook** | GH 或工作站 | HTTP 调用 | 不需要（Portainer 已是 root） | 需要 | 中 | 中 |
 | **F. Watchtower 自动更新** | GH | 定时拉取 | 不需要 | registry ❌ | **差** ❌ | 低 |
@@ -130,6 +130,7 @@ NAS: docker load → docker compose up -d → 健康检查
 可配国内镜像加速，但 GHCR 没有稳定的公共镜像。
 
 **仅在**你确认 NAS 能顺畅访问 ghcr.io 时选它。
+（且 Container Manager 的 **UI 无法认证 GHCR**，必须走 CLI —— 外部调研与我们的实测一致。）
 
 触发 NAS 更新有三种：
 1. Container Manager 项目的 **Webhook**（DSM 界面里对项目可生成 webhook URL）—— 需界面确认
@@ -139,6 +140,12 @@ NAS: docker load → docker compose up -d → 健康检查
 ---
 
 ### 方案 C：NAS 本地构建 + 计划任务（**零权限改动**）
+
+> ✅ **第二轮更正：本方案成立。** 你的 `dockerd.json` 已配 9 个镜像加速源，
+> 其中 **3 个实测可用**（`docker.m.daocloud.io`、`docker.jianmuhub.com`、
+> `dockerhub1.beget.com`）→ NAS 能拉到基础镜像。
+> 但仍不推荐作为主力：**NAS 的引擎是 Docker 24.0.2**（上游 2024-06 起已不维护），
+> 且构建要占满 4 个核心 10–30 分钟。详见架构文档 §8、§9。
 
 ```
 DSM 计划任务（root，每日/每 5 分钟）
