@@ -272,3 +272,140 @@ sudo cat /var/packages/ContainerManager/etc/dockerd.json
 
 6. **无论选哪个**：部署前 `pg_dump` 备份、固定 tag、保留 rollback 镜像、
    永不 `docker compose down -v`（这条你的 `部署说明.txt` 里也写了）。
+
+
+---
+
+# 第三轮补充：外部调研 + 实测修正
+
+> 本轮联网检索了群晖 NAS 上的 CI/CD 实践，并在 NAS 上补测了镜像源与引擎版本。
+> **其中两条结论修正了本文件前面的判断。**
+
+## 8. 镜像源实测：9 个里只有 3 个活着
+
+你的 `dockerd.json` 配了 9 个加速源，逐个实测结果：
+
+| 镜像源 | 结果 |
+|---|---|
+| `docker.m.daocloud.io` | ✅ 401（registry 正常） |
+| `docker.jianmuhub.com` | ✅ 401 |
+| `dockerhub1.beget.com` | ✅ 200 |
+| `dockerhub.azk8s.cn` | ⚠️ 403（该服务早已停止） |
+| `hub-mirror.c.163.com` | ❌ 不可达 |
+| `mirror.ccs.tencentyun.com` | ❌ 不可达（仅腾讯云内网可用） |
+| `huecker.io` / `dockerhub.timeweb.cloud` / `noohub.ru` | ❌ 不可达 |
+
+### ⚠️ 修正结论 1：**NAS 本地构建是可行的**
+
+第一轮我判定「NAS 无法本地构建」，依据是 `auth.docker.io` 不可达。
+但 `dockerd.json` 里已配好加速源，且其中 **3 个实测可用** →
+**NAS 能拉取 `golang` / `oven/bun` / `debian` 等基础镜像，架构 D 成立。**
+
+代价仍是速度（4 线程，构建 10–30 分钟）与对 NAS 的负载。
+
+## 9. 引擎版本：**Docker 24.0.2（老旧）**
+
+实测：`Docker version 24.0.2, build 610b8d0` / `containerd 1.7.1` / `compose v2.20.1`。
+
+外部调研明确指出群晖 Container Manager 长期停留在 **Docker 24.0.2**，
+**上游自 2024 年 6 月起已不再支持该版本**。可能的影响：
+
+- 缺少两年多的安全补丁
+- 较新的 BuildKit / compose 语法可能不支持
+- 本仓库的 `Dockerfile` 用了 buildx + digest 固定基础镜像，**在 24.0.2 上需实测确认**
+
+→ 这也是「**构建放在外部、NAS 只负责运行**」更稳的另一个理由。
+
+## 10. ⚠️ 修正结论 2：Portainer 的 stack webhook 是**商业版功能**
+
+第一轮我把「Portainer webhook」列为方案 E 的推荐路径。
+外部资料确认：**Portainer CE 的 stack webhook 属于 Business Edition 功能**，
+CE 需要额外的社区 sidecar（如 `aklinker1/portainer-stack-webhook`）才能实现等价能力。
+
+→ 方案 E 的落地成本被低估了，**降级为备选**。
+
+## 11. 外部调研印证了主结论
+
+一份针对「群晖上的 CI/CD」的深度调研，其结论与本文件一致：
+
+| 外部结论 | 与本文件的关系 |
+|---|---|
+| 推荐组合是 **Container Manager + Compose + 一个 bash 部署脚本** | 与本文件 §4 推荐一致 ✅ |
+| Coolify / Dokploy / k3s **在 DSM 上跑不起来**（安装器失败、引擎版本冲突、内核模块缺失） | 印证「不要自建 PaaS」 |
+| Container Manager 的 **UI 无法认证 GHCR**（`Registry returned bad result`），但 CLI 可以 | 与我们的 ghcr 实测一致 |
+| **Task Scheduler 默认以 root 运行** | 印证本文件的核心手段 ✅ |
+| 自托管 GitHub Runner **只适合私有仓库**（公开仓库有 forker 执行恶意 workflow 的风险） | 排除架构 D 的 runner 变体 |
+| 群晖 SSH 的 **home 目录权限若为 777 会静默破坏密钥认证**（需 755 / `.ssh` 755 / `authorized_keys` 644） | 新增注意事项，见 §13 |
+| **BTRFS 快照可能吃掉整个卷**（有案例在 10.5T 卷上累积 4.7T 快照） | 新增风险，见 §13 |
+
+## 12. ⚠️ 安全：`synoschedtask --run` 曾被恶意软件滥用
+
+检索中出现一条社区帖子，标题为
+「**Malware Warning - `/usr/syno/bin/synoschedtask --run id=1`**」。
+该页面正文我未能抓取（只返回了站点外壳），所以**无法确认细节**，
+但标题本身是一个明确信号：**用计划任务做提权/持久化是已被滥用的手法**。
+
+### 这对架构 A / B 的影响
+
+我前面说架构 A「SSH 密钥只能写文件、权限最小」——这个说法**需要收紧**：
+
+- 你的 SSH 账号本身是 **administrators**，它是否能触发 root 计划任务尚未验证
+- 若**普通用户也能 `synoschedtask --run`**，那么持有该 SSH 凭据 ≈ 持有 root
+  → 架构 A 与架构 C 的权限差距**没有我说的那么大**
+
+**修正后的建议**：
+
+| | 修正前 | 修正后 |
+|---|---|---|
+| 架构 A（drop-box） | 🟢 最小权限 | 🟡 权限取决于该账号能否触发任务 |
+| 架构 B（触发任务） | 低延迟升级选项 | ⚠️ 同时也是一个**提权面**，需谨慎 |
+
+**真正能收紧权限的做法**（如果你在意这个边界）：
+1. 在 DSM 计划任务里，脚本**只读固定路径**的 `compose.yaml`，绝不读取 staging 里传入的文件
+2. staging 目录设为 `hiblacker:users 700`，脚本校验推送文件的属主
+3. 给 CI 单独建一个**非 administrators** 的 DSM 账号，只用它做文件投递
+
+## 13. 两个新增的运维风险（来自外部案例）
+
+### 13.1 BTRFS 快照可能吃满卷
+
+你的 docker data-root 在 btrfs 上（`/var/packages/ContainerManager/var/docker`）。
+外部案例：有用户在 10.5T 卷上累积了 **4.7T 的 `@docker` 快照**，
+且激进清理导致**所有容器损坏**。
+
+→ 建议：定期 `du`/快照配额监控，**不要**盲目批量删快照。
+
+### 13.2 定期清理是必需项
+
+镜像与构建缓存会持续累积。推荐用计划任务（root）跑：
+
+```bash
+docker image prune -f --filter "until=168h"    # 保留一周
+docker builder prune -f --filter "until=168h"
+```
+
+注意：**不要**用 `docker system prune -a`，它会删掉 rollback 镜像，
+破坏「可回滚」这个核心保障。
+
+## 14. 更新后的最终建议
+
+1. **构建放外部**（CI 或工作站）→ 仍然首选。
+   理由更新为：不仅因为 NAS 连不上 Docker Hub，更因为**NAS 的引擎是 24.0.2**，
+   在旧引擎上构建现代镜像有额外不确定性。
+
+2. **交付方式二选一**（都不依赖 NAS 出网）：
+   - 首选：`docker save | ssh | docker load`（`deploy/nas.sh transfer` 已实现）
+   - 备选：推到 **GHCR**，NAS 侧 `docker compose pull`（外部资料称 CLI 可用、UI 不行）
+     —— 但我们的实测是 ghcr token 被拒，**需先验证**
+
+3. **触发与提权**：计划任务以 root 运行，这是既定事实；
+   但**不要把它当作"安全的提权边界"**（见 §12）。
+   若希望权限边界清晰，采用 §12 的三条收紧措施。
+
+4. **补充运维自动化**（计划任务，root）：
+   - 每日 `pg_dump` 备份 + 保留 N 份
+   - 每周 `docker image/builder prune`（**排除 rollback 镜像**）
+   - 快照容量监控
+
+5. **明确的排除项**：Coolify、Dokploy、k3s、自托管 Runner（公开仓库）、
+   Watchtower、Portainer CE webhook（需商业版）。

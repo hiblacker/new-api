@@ -176,6 +176,9 @@ docker compose up -d
 **优点**：CI 不需要 NAS 的 SSH 凭据，只需要一个 webhook URL（可随时重置）
 **缺点**：多一个常驻容器；Portainer 本身是额外攻击面（务必只在内网、加认证）
 
+> ⚠️ **更正（外部调研）**：Portainer 的 stack webhook 属于 **Business Edition** 功能，
+> CE 版需要额外 sidecar 才能实现等价能力。**本方案落地成本被低估，降级为备选。**
+
 > 这条路线对你可能比方案 A 更安全：**CI 拿到的是一个 webhook URL，而不是 NAS 的 shell 访问权**。
 
 ---
@@ -255,3 +258,9 @@ docker compose up -d
 > 一条**仅限 docker 的 NOPASSWD** 解决。
 >
 > Watchtower 这类「自动跟随 latest」的做法与可回滚目标冲突，排除。
+
+---
+
+> **本文档已被 `NAS-DEPLOY-ARCHITECTURE.md` 第三轮补充部分修正**，
+> 两处修正：① NAS 本地构建其实可行（镜像源有 3 个可用）；② Portainer webhook 需商业版。
+> 请以架构文档的最终建议为准。
