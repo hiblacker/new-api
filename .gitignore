@@ -44,3 +44,7 @@ relaykit/relayconvert/chat_responses_live_local_test.go
 service/openaicompat/chat_responses_live_local_test.go
 go.work
 go.work.sum
+
+# 本地 NAS 部署配置与采集结果（含主机/账号信息，不入库）
+deploy/nas.env
+deploy/.recon.txt
