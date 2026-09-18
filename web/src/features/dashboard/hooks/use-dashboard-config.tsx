@@ -101,7 +101,15 @@ export function useSummaryCardsConfig(totals: {
 }) {
   const { t } = useTranslation()
 
+  // Array order is the display order of the overview cards.
   return [
+    {
+      key: 'lifetimeTokens',
+      title: t('Total Tokens'),
+      value: totals.lifetimeTokenDisplay,
+      description: t('All-time token usage'),
+      icon: Sigma,
+    },
     {
       key: 'windowTokens',
       title: t('Token Usage'),
@@ -124,13 +132,6 @@ export function useSummaryCardsConfig(totals: {
       value: totals.requestCountDisplay,
       description: t('Total requests made'),
       icon: Activity,
-    },
-    {
-      key: 'lifetimeTokens',
-      title: t('Total Tokens'),
-      value: totals.lifetimeTokenDisplay,
-      description: t('All-time token usage'),
-      icon: Sigma,
     },
   ]
 }

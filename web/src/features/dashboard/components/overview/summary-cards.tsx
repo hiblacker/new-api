@@ -32,9 +32,20 @@ import { formatNumber, formatQuota } from '@/lib/format'
 import { computeTimeRange } from '@/lib/time'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { StatCard } from '../ui/stat-card'
+import { StatCard, type StatCardTone } from '../ui/stat-card'
 
 const SUMMARY_SPARKLINE_BUCKETS = 12
+
+// Tones follow the card itself rather than its slot, so reordering the cards in
+// useSummaryCardsConfig never repaints them.
+const SUMMARY_CARD_TONES: Record<string, StatCardTone> = {
+  windowTokens: 'accent-1',
+  usage: 'accent-2',
+  requests: 'accent-3',
+  lifetimeTokens: 'accent-4',
+}
+
+const DEFAULT_SUMMARY_CARD_TONE: StatCardTone = 'accent-4'
 
 type SummaryWindow = 'last24h' | 'today'
 
@@ -235,16 +246,14 @@ export function SummaryCards() {
     lifetimeTokenDisplay: formatNumber(lifetimeTokenQuery.data?.data?.token),
     currencyEnabled,
     currencyLabel,
-  }).map((config, index) => {
-    const tones = ['accent-1', 'accent-2', 'accent-3', 'accent-4'] as const
-
+  }).map((config) => {
     return {
       key: config.key,
       title: config.title,
       value: config.value,
       desc: config.description,
       icon: config.icon,
-      tone: tones[index] ?? 'accent-4',
+      tone: SUMMARY_CARD_TONES[config.key] ?? DEFAULT_SUMMARY_CARD_TONE,
       loading:
         config.key === 'lifetimeTokens'
           ? loading || lifetimeTokenQuery.isLoading

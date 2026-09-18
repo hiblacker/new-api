@@ -23,7 +23,7 @@ import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
-type StatCardTone = 'accent-1' | 'accent-2' | 'accent-3' | 'accent-4'
+export type StatCardTone = 'accent-1' | 'accent-2' | 'accent-3' | 'accent-4'
 type StatCardSparklineVariant = 'bars' | 'line'
 type StatCardDetailTone =
   | 'default'

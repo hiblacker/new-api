@@ -138,6 +138,25 @@ describe('overview summary cards', () => {
     expect(screen.queryByText('Runway')).not.toBeInTheDocument()
   })
 
+  it('renders the all-time token total ahead of the windowed token card', async () => {
+    renderSummaryCards()
+
+    const titles = [
+      'Total Tokens',
+      'Token Usage',
+      'Historical Usage',
+      'Request Count',
+    ]
+    const nodes = await Promise.all(titles.map((title) => screen.findByText(title)))
+
+    for (let index = 1; index < nodes.length; index += 1) {
+      expect(
+        nodes[index - 1].compareDocumentPosition(nodes[index]) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy()
+    }
+  })
+
   it('leaves the other cards trends untouched when the switcher moves', async () => {
     const user = userEvent.setup()
     const now = Math.floor(Date.now() / 1000)
