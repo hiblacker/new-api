@@ -9,30 +9,14 @@
 #   docker build -f deploy/Dockerfile.mirror \
 #     --build-arg REGISTRY_MIRROR=docker.jianmuhub.com -t new-api:<tag> .
 #
-# 上游 Dockerfile 保持不动，便于与上游对比和合并。
-#
-# 关于 digest（实测结论，2026-09）：
-#
-#   library/golang:1.26.1-alpine  → tag 与上游 digest 完全一致 ✅
-#   oven/bun:1.4.0                → tag 与上游 digest 完全一致 ✅
-#   library/debian:bookworm-slim  → tag 已漂移 ❌
-#         tag 现在指向 sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
-#         上游固定的是  sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a
-#
-# 也就是说「改版本号」的代价**不是理论风险**：debian 的 tag 已经动过了。
-# 因此这里保留上游的 digest —— 镜像源（daocloud）能正常提供它们，
-# 用 digest 不增加任何成本，却能保证运行时基础与上游一致。
-#
-# 若你确实想改成版本号，把三个 FROM 的 @sha256:... 删掉即可，
-# 但请知悉 debian 会变成与上游不同的、更新的基础镜像。
+# 三个基础镜像只使用版本标签，便于在受限网络下手动拉取。
 
 # 基础镜像源（Docker Hub 不可达时使用）
 ARG REGISTRY_MIRROR=docker.m.daocloud.io
 # Debian 软件源（官方 deb.debian.org 实测仅 ~200KB/s 且会 502）
 ARG APT_MIRROR=mirrors.ustc.edu.cn
 
-# 上游对应 digest: sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6
-FROM ${REGISTRY_MIRROR}/oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6 AS builder
+FROM ${REGISTRY_MIRROR}/oven/bun:1.4.0 AS builder
 
 WORKDIR /build/web
 COPY web/package.json web/bun.lock ./
@@ -41,8 +25,7 @@ COPY ./web ./
 COPY ./VERSION /build/VERSION
 RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat /build/VERSION) bun run build
 
-# 上游对应 digest: sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039
-FROM ${REGISTRY_MIRROR}/library/golang:1.26.1-alpine@sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039 AS builder2
+FROM ${REGISTRY_MIRROR}/library/golang:1.26.1-alpine AS builder2
 ENV GO111MODULE=on CGO_ENABLED=0 GOWORK=off
 
 ARG TARGETOS
@@ -62,8 +45,7 @@ COPY . .
 COPY --from=builder /build/web/dist ./web/dist
 RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
 
-# 上游对应 digest: sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a
-FROM ${REGISTRY_MIRROR}/library/debian:bookworm-slim@sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a
+FROM ${REGISTRY_MIRROR}/library/debian:bookworm-slim
 
 ARG APT_MIRROR
 
