@@ -39,6 +39,8 @@ const LIFETIME_TOKENS = 1_234_567
 let client: QueryClient
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 9, 15, 12, 34, 56))
   window.localStorage.clear()
   useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
   useAuthStore.getState().auth.setUser({
@@ -54,6 +56,11 @@ beforeEach(() => {
   })
 
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
+    if (url === '/api/user/self') {
+      return {
+        data: { success: true, data: useAuthStore.getState().auth.user },
+      }
+    }
     if (url === '/api/data/self') {
       return { data: { success: true, data: WINDOW_ROWS } }
     }
@@ -79,6 +86,7 @@ afterEach(() => {
   useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
   window.localStorage.clear()
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 function renderSummaryCards() {
@@ -87,18 +95,6 @@ function renderSummaryCards() {
       <SummaryCards />
     </QueryClientProvider>
   )
-}
-
-function windowStartTimestamps(): (number | undefined)[] {
-  return vi
-    .mocked(api.get)
-    .mock.calls.filter((call) => String(call[0]) === '/api/data/self')
-    .map((call) => {
-      const config = call[1] as
-        | { params?: { start_timestamp?: number } }
-        | undefined
-      return config?.params?.start_timestamp
-    })
 }
 
 function todayStart(expectedNow: number): number {
@@ -147,7 +143,9 @@ describe('overview summary cards', () => {
       'Historical Usage',
       'Request Count',
     ]
-    const nodes = await Promise.all(titles.map((title) => screen.findByText(title)))
+    const nodes = await Promise.all(
+      titles.map((title) => screen.findByText(title))
+    )
 
     for (let index = 1; index < nodes.length; index += 1) {
       expect(
@@ -193,17 +191,16 @@ describe('overview summary cards', () => {
 
     renderSummaryCards()
 
-    // Wait for the trailing-24h window to land (1 + 2 + 3 tokens) so the
-    // captured trend is real data rather than the empty placeholder line.
-    expect(await screen.findByText('6')).toBeInTheDocument()
+    // Wait for today's data before capturing the other cards' trends.
+    expect(await screen.findByText('999')).toBeInTheDocument()
     const before = sparklinePathFor('Request Count')
     expect(before).toBeTruthy()
 
-    await user.click(await screen.findByRole('button', { name: 'Today' }))
+    await user.click(screen.getByRole('button', { name: 'Last 24 hours' }))
 
-    // Wait for the today window to actually land (the token card shows the
-    // today-only total) before checking the other cards.
-    expect(await screen.findByText('999')).toBeInTheDocument()
+    // Wait for the trailing-24h total (1 + 2 + 3 tokens) before checking
+    // the other cards.
+    expect(await screen.findByText('6')).toBeInTheDocument()
 
     // Only the windowed token card follows the switcher, so the request card
     // keeps drawing the very same trailing-24h trend.
@@ -226,7 +223,7 @@ describe('overview summary cards', () => {
     ).toBeInTheDocument()
   })
 
-  it('defaults to the last 24 hours and switches the window to today on click', async () => {
+  it('defaults to today and switches to the last 24 hours on click', async () => {
     const user = userEvent.setup()
     renderSummaryCards()
 
@@ -234,6 +231,11 @@ describe('overview summary cards', () => {
       name: 'Last 24 hours',
     })
     const today = screen.getByRole('button', { name: 'Today' })
+    expect(today).toHaveAttribute('aria-pressed', 'true')
+    expect(last24h).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(last24h)
+
     expect(last24h).toHaveAttribute('aria-pressed', 'true')
     expect(today).toHaveAttribute('aria-pressed', 'false')
 
@@ -241,24 +243,21 @@ describe('overview summary cards', () => {
 
     expect(today).toHaveAttribute('aria-pressed', 'true')
     expect(last24h).toHaveAttribute('aria-pressed', 'false')
-
-    // Today must be requested as local midnight -> end of day, not a trailing 24h window.
-    const todayStart = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000)
-    await waitFor(() => {
-      expect(windowStartTimestamps()).toContain(todayStart)
-    })
   })
 
-  it('requests the trailing 24 hour window by default', async () => {
+  it('requests today from local midnight through the end of day by default', async () => {
     renderSummaryCards()
 
-    const expectedStart = Math.floor(Date.now() / 1000) - 23 * 3600
     await waitFor(() => {
-      const starts = windowStartTimestamps().filter(
-        (value): value is number => value !== undefined
-      )
-      expect(starts.length).toBeGreaterThan(0)
-      expect(Math.abs(starts[0] - expectedStart)).toBeLessThan(120)
+      expect(api.get).toHaveBeenCalledWith('/api/data/self', {
+        params: {
+          start_timestamp: Math.floor(new Date(2026, 9, 15).getTime() / 1000),
+          end_timestamp: Math.floor(
+            new Date(2026, 9, 15, 23, 59, 59).getTime() / 1000
+          ),
+          default_time: 'hour',
+        },
+      })
     })
   })
 })

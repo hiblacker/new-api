@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { VChart } from '@visactor/react-vchart'
-import { BarChart3, Filter, RotateCcw, Search } from 'lucide-react'
+import { BarChart3, Filter, RefreshCw, RotateCcw, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -39,6 +39,7 @@ import {
 import { useTheme } from '@/context/theme-provider'
 import { getUserQuotaDates } from '@/features/dashboard/api'
 import { SectionDivider } from '@/features/dashboard/components/ui/section-divider'
+import { useRefreshCooldown } from '@/features/dashboard/hooks/use-refresh-cooldown'
 import { useVChartTheme } from '@/features/dashboard/hooks/use-vchart-theme'
 import { getDashboardChartColors } from '@/features/dashboard/lib/charts'
 import {
@@ -59,6 +60,7 @@ import {
   type TokenUsageSettings,
 } from '@/features/dashboard/lib/token-usage'
 import { formatCompactNumber, formatNumber } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { VCHART_OPTION } from '@/lib/vchart'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -256,6 +258,7 @@ export function TokenUsageChart() {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
   const themeReady = useVChartTheme()
+  const { coolingDown, startCooldown } = useRefreshCooldown()
   const user = useAuthStore((state) => state.auth.user)
   const isAdmin = !!(user?.role && user.role >= 10)
   const selfUsername = user?.username ?? ''
@@ -292,37 +295,37 @@ export function TokenUsageChart() {
       settings.granularity,
       isAdmin ? selfUsername : '',
     ],
-    queryFn: async () =>
-      getUserQuotaDates(
+    queryFn: async () => {
+      const bounds = boundsForRangeKey(settings.rangeKey, settings)
+      const result = await getUserQuotaDates(
         {
-          start_timestamp: settings.start,
-          end_timestamp: settings.end,
+          start_timestamp: bounds.start,
+          end_timestamp: bounds.end,
           default_time: settings.granularity,
           // The admin endpoint aggregates every user unless a username is
           // given, and this overview is a personal view.
           ...(isAdmin && selfUsername ? { username: selfUsername } : {}),
         },
         isAdmin
-      ),
+      )
+      return { ...result, bounds }
+    },
     staleTime: 60 * 1000,
   })
 
+  const refreshing = usageQuery.isFetching || coolingDown
+
   const series = useMemo(() => {
     const rows = usageQuery.data?.data ?? []
+    const bounds = usageQuery.data?.bounds ?? settings
     return buildTokenUsageSeries(
       rows,
-      axisStartFor(rows, settings.start, settings.end),
-      settings.end,
+      axisStartFor(rows, bounds.start, bounds.end),
+      bounds.end,
       settings.granularity,
       t('Other')
     )
-  }, [
-    settings.end,
-    settings.granularity,
-    settings.start,
-    t,
-    usageQuery.data?.data,
-  ])
+  }, [settings, t, usageQuery.data])
 
   const spec = useMemo(() => {
     if (series.models.length === 0) return null
@@ -445,6 +448,24 @@ export function TokenUsageChart() {
               settings={settings}
               onApply={applySettings}
             />
+            <Button
+              type='button'
+              variant='outline'
+              size='icon-sm'
+              onClick={() => {
+                if (usageQuery.isFetching || !startCooldown()) return
+                void usageQuery.refetch({ cancelRefetch: false })
+              }}
+              disabled={refreshing}
+              aria-label={t('Refresh')}
+              aria-busy={refreshing}
+              title={refreshing ? t('Refreshing...') : t('Refresh')}
+            >
+              <RefreshCw
+                aria-hidden='true'
+                className={cn(refreshing && 'animate-spin')}
+              />
+            </Button>
           </div>
         </div>
       </div>

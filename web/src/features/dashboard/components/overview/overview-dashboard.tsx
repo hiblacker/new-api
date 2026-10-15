@@ -56,8 +56,8 @@ import { getUserModels } from '@/lib/api'
 import { MOTION_TRANSITION } from '@/lib/motion'
 import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
-import { useAuthStore } from '@/stores/auth-store'
 
+import { useOverviewAccount } from '../../hooks/use-overview-account'
 import {
   useApiInfo,
   useDashboardContentVisibility,
@@ -65,6 +65,7 @@ import {
 import { AnnouncementsPanel } from './announcements-panel'
 import { ApiInfoPanel } from './api-info-panel'
 import { FAQPanel } from './faq-panel'
+import { OverviewRefreshControls } from './overview-refresh-controls'
 import { PerformanceHealthPanel } from './performance-health-panel'
 import { SummaryCards } from './summary-cards'
 import { UptimePanel } from './uptime-panel'
@@ -480,7 +481,7 @@ export function OverviewDashboard() {
   const { t } = useTranslation()
   const setupGuideId = useId()
   const setupGuideToggleRef = useRef<HTMLButtonElement>(null)
-  const user = useAuthStore((state) => state.auth.user)
+  const user = useOverviewAccount()
   const { items: apiInfoItems } = useApiInfo()
   const {
     apiInfo: showApiInfoPanel,
@@ -660,6 +661,7 @@ export function OverviewDashboard() {
             {t('Setup guide')}
           </Button>
         )}
+        <OverviewRefreshControls />
       </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
         <div className='flex flex-col gap-4'>

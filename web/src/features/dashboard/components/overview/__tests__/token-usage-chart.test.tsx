@@ -41,10 +41,19 @@ vi.mock('@visactor/vchart', () => ({
 
 const DAY_SECONDS = 86_400
 const STORAGE_KEY = 'dashboard_overview_token_usage_settings'
+const originalGetAnimations = Object.getOwnPropertyDescriptor(
+  Element.prototype,
+  'getAnimations'
+)
 
 let client: QueryClient
 
 beforeEach(() => {
+  // jsdom has no Web Animations API; Base UI uses it to measure scrolling.
+  Object.defineProperty(Element.prototype, 'getAnimations', {
+    configurable: true,
+    value: () => [],
+  })
   window.localStorage.clear()
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
@@ -61,6 +70,15 @@ afterEach(() => {
   useAuthStore.setState(useAuthStore.getInitialState(), true)
   window.localStorage.clear()
   vi.restoreAllMocks()
+  if (originalGetAnimations) {
+    Object.defineProperty(
+      Element.prototype,
+      'getAnimations',
+      originalGetAnimations
+    )
+  } else {
+    Reflect.deleteProperty(Element.prototype, 'getAnimations')
+  }
 })
 
 function signIn(role: number, username: string) {

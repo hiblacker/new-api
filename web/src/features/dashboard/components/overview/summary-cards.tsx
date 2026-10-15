@@ -30,8 +30,8 @@ import { useStatus } from '@/hooks/use-status'
 import { getCurrencyLabel, isCurrencyDisplayEnabled } from '@/lib/currency'
 import { formatNumber, formatQuota } from '@/lib/format'
 import { computeTimeRange } from '@/lib/time'
-import { useAuthStore } from '@/stores/auth-store'
 
+import { useOverviewAccount } from '../../hooks/use-overview-account'
 import { StatCard, type StatCardTone } from '../ui/stat-card'
 
 const SUMMARY_SPARKLINE_BUCKETS = 12
@@ -113,57 +113,40 @@ function sumTokenUsed(data: QuotaDataItem[]): number {
 
 export function SummaryCards() {
   const { t } = useTranslation()
-  const user = useAuthStore((state) => state.auth.user)
+  const user = useOverviewAccount()
   const { status, loading } = useStatus()
-  const [summaryWindow, setSummaryWindow] = useState<SummaryWindow>('last24h')
+  const [summaryWindow, setSummaryWindow] = useState<SummaryWindow>('today')
 
   const usedQuota = Number(user?.used_quota ?? 0)
   const requestCount = Number(user?.request_count ?? 0)
 
-  // Fixed trailing 24 hours. Cards that are not driven by the window switcher
-  // keep their trend based on this range so toggling never moves them.
-  const baselineTimeRange = useMemo(() => computeTimeRange(1), [])
-
-  const windowTimeRange = useMemo(() => {
-    // computeTimeRange(1) covers the trailing 24 hours; a zero-day range
-    // normalized to the start of day covers today (00:00:00-23:59:59).
-    if (summaryWindow === 'today') {
-      return computeTimeRange(0, undefined, undefined, true)
-    }
-    return baselineTimeRange
-  }, [baselineTimeRange, summaryWindow])
-
   const usageTrendQuery = useQuery({
-    queryKey: [
-      'dashboard',
-      'overview',
-      'summary-sparklines',
-      windowTimeRange.start_timestamp,
-      windowTimeRange.end_timestamp,
-    ],
-    queryFn: async () =>
-      getUserQuotaDates({
-        start_timestamp: windowTimeRange.start_timestamp,
-        end_timestamp: windowTimeRange.end_timestamp,
+    queryKey: ['dashboard', 'overview', 'summary-sparklines', summaryWindow],
+    queryFn: async () => {
+      const timeRange =
+        summaryWindow === 'today'
+          ? computeTimeRange(0, undefined, undefined, true)
+          : computeTimeRange(1)
+      const result = await getUserQuotaDates({
+        ...timeRange,
         default_time: 'hour',
-      }),
+      })
+      return { ...result, timeRange }
+    },
     staleTime: 60 * 1000,
   })
 
+  // Other cards always use the trailing-24h trend, even when tokens show today.
   const baselineTrendQuery = useQuery({
-    queryKey: [
-      'dashboard',
-      'overview',
-      'summary-sparklines',
-      baselineTimeRange.start_timestamp,
-      baselineTimeRange.end_timestamp,
-    ],
-    queryFn: async () =>
-      getUserQuotaDates({
-        start_timestamp: baselineTimeRange.start_timestamp,
-        end_timestamp: baselineTimeRange.end_timestamp,
+    queryKey: ['dashboard', 'overview', 'summary-sparklines', 'last24h'],
+    queryFn: async () => {
+      const timeRange = computeTimeRange(1)
+      const result = await getUserQuotaDates({
+        ...timeRange,
         default_time: 'hour',
-      }),
+      })
+      return { ...result, timeRange }
+    },
     staleTime: 60 * 1000,
   })
 
@@ -188,28 +171,20 @@ export function SummaryCards() {
     () =>
       buildSummarySparklines(
         usageTrendQuery.data?.data ?? [],
-        windowTimeRange.start_timestamp,
-        windowTimeRange.end_timestamp
+        usageTrendQuery.data?.timeRange.start_timestamp ?? 0,
+        usageTrendQuery.data?.timeRange.end_timestamp ?? 0
       ),
-    [
-      usageTrendQuery.data?.data,
-      windowTimeRange.end_timestamp,
-      windowTimeRange.start_timestamp,
-    ]
+    [usageTrendQuery.data]
   )
 
   const baselineSparklines = useMemo(
     () =>
       buildSummarySparklines(
         baselineTrendQuery.data?.data ?? [],
-        baselineTimeRange.start_timestamp,
-        baselineTimeRange.end_timestamp
+        baselineTrendQuery.data?.timeRange.start_timestamp ?? 0,
+        baselineTrendQuery.data?.timeRange.end_timestamp ?? 0
       ),
-    [
-      baselineTimeRange.end_timestamp,
-      baselineTimeRange.start_timestamp,
-      baselineTrendQuery.data?.data,
-    ]
+    [baselineTrendQuery.data]
   )
 
   const windowTokens = useMemo(
