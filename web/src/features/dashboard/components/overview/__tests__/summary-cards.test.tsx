@@ -36,14 +36,6 @@ const WINDOW_ROWS = [
 
 const LIFETIME_TOKENS = 1_234_567
 
-// Today's split served by the token breakdown endpoint, used by the usage logs
-// variant of the cards.
-const TODAY_TOKEN_STAT = {
-  prompt_tokens: 1200,
-  completion_tokens: 5,
-  cache_tokens: 300,
-}
-
 let client: QueryClient
 
 beforeEach(() => {
@@ -71,9 +63,6 @@ beforeEach(() => {
     }
     if (url === '/api/data/self') {
       return { data: { success: true, data: WINDOW_ROWS } }
-    }
-    if (url.startsWith('/api/log/self/token_stat')) {
-      return { data: { success: true, data: TODAY_TOKEN_STAT } }
     }
     if (url.startsWith('/api/log/self/stat')) {
       return {
@@ -108,11 +97,11 @@ function renderSummaryCards() {
   )
 }
 
-/** The usage logs page renders the same cards in their logs variant. */
-function renderLogsSummaryCards() {
+/** The usage logs page renders the cards without the panel frame. */
+function renderBareSummaryCards() {
   return render(
     <QueryClientProvider client={client}>
-      <SummaryCards variant='logs' />
+      <SummaryCards bare />
     </QueryClientProvider>
   )
 }
@@ -290,40 +279,17 @@ describe('overview summary cards', () => {
     expect(screen.getByText(/^1[.,\s]?234[.,\s]?567$/)).toBeInTheDocument()
   })
 
-  it('does not request the today token breakdown on the overview page', async () => {
-    renderSummaryCards()
+  it('renders the cards without the panel frame when bare', async () => {
+    renderBareSummaryCards()
 
-    await screen.findByText('1.2M')
+    expect(await screen.findByText('Total Tokens')).toBeInTheDocument()
+    expect(screen.getByText('Historical Usage')).toBeInTheDocument()
 
+    // The usage logs page supplies its own layout, so neither the panel title
+    // nor its caption may show up there.
+    expect(screen.queryByText('Usage at a glance')).not.toBeInTheDocument()
     expect(
-      vi
-        .mocked(api.get)
-        .mock.calls.some(([url]) => String(url).includes('/token_stat'))
-    ).toBe(false)
-  })
-
-  it('replaces the spend card with today tokens and the input/output/cache split', async () => {
-    const now = Math.floor(Date.now() / 1000)
-    renderLogsSummaryCards()
-
-    expect(await screen.findByText('Today Tokens')).toBeInTheDocument()
-    // The usage logs page must not carry a currency figure.
-    expect(screen.queryByText('Historical Usage')).not.toBeInTheDocument()
-
-    // 1200 prompt + 5 completion tokens, captioned with the split below.
-    expect(await screen.findByText(/^1[.,\s]?205$/)).toBeInTheDocument()
-    expect(
-      screen.getByText('Input: 1.2K / Output: 5 / Cache: 300')
-    ).toBeInTheDocument()
-
-    await waitFor(() => {
-      const call = vi
-        .mocked(api.get)
-        .mock.calls.find(([url]) => String(url).includes('/token_stat'))
-      expect(String(call?.[0])).toContain(`start_timestamp=${todayStart(now)}`)
-      expect(String(call?.[0])).toContain(
-        `end_timestamp=${Math.floor(new Date(2026, 9, 15, 23, 59, 59).getTime() / 1000)}`
-      )
-    })
+      screen.queryByText('Monitor token usage and request volume')
+    ).not.toBeInTheDocument()
   })
 })

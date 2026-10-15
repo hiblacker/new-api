@@ -425,23 +425,6 @@ export interface GetLogStatsResponse {
   data?: LogStatistics
 }
 
-/**
- * Token split of the caller's own consume logs. Cached prompt tokens are a
- * subset of the prompt tokens, matching how the log details dialog reports
- * them.
- */
-export interface LogTokenStat {
-  prompt_tokens: number
-  completion_tokens: number
-  cache_tokens: number
-}
-
-export interface GetLogTokenStatResponse {
-  success: boolean
-  message?: string
-  data?: LogTokenStat
-}
-
 // ============================================================================
 // Drawing Log Types
 // ============================================================================

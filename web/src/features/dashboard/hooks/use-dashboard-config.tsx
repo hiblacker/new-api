@@ -25,7 +25,6 @@ import {
   Sigma,
   TrendingUp,
   Activity,
-  CalendarDays,
   type LucideIcon,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -91,9 +90,6 @@ export function useModelStatCardsConfig(): StatCardConfig[] {
   ]
 }
 
-/** The overview panel and the usage logs page share these cards. */
-export type SummaryCardsVariant = 'overview' | 'logs'
-
 export function useSummaryCardsConfig(totals: {
   windowTokenDisplay: string
   windowLabel: string
@@ -102,32 +98,8 @@ export function useSummaryCardsConfig(totals: {
   lifetimeTokenDisplay: string
   currencyLabel: string
   currencyEnabled: boolean
-  variant?: SummaryCardsVariant
-  todayTokenDisplay?: string
-  todayTokenBreakdown?: string
 }) {
   const { t } = useTranslation()
-
-  // The usage logs page must not surface a currency figure, so its spend card
-  // becomes a today-token card carrying the input/output/cache breakdown.
-  const consumptionCard =
-    totals.variant === 'logs'
-      ? {
-          key: 'todayTokens',
-          title: t('Today Tokens'),
-          value: totals.todayTokenDisplay ?? '',
-          description: totals.todayTokenBreakdown ?? '',
-          icon: CalendarDays,
-        }
-      : {
-          key: 'usage',
-          title: t('Historical Usage'),
-          value: totals.usedDisplay,
-          description: totals.currencyEnabled
-            ? `${t('Total consumed')} (${totals.currencyLabel})`
-            : t('Total consumed quota'),
-          icon: TrendingUp,
-        }
 
   // Array order is the display order of the overview cards.
   return [
@@ -145,7 +117,15 @@ export function useSummaryCardsConfig(totals: {
       description: `${t('Tokens used')} · ${totals.windowLabel}`,
       icon: Layers,
     },
-    consumptionCard,
+    {
+      key: 'usage',
+      title: t('Historical Usage'),
+      value: totals.usedDisplay,
+      description: totals.currencyEnabled
+        ? `${t('Total consumed')} (${totals.currencyLabel})`
+        : t('Total consumed quota'),
+      icon: TrendingUp,
+    },
     {
       key: 'requests',
       title: t('Request Count'),

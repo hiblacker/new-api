@@ -23,13 +23,9 @@ import { useTranslation } from 'react-i18next'
 import { StaggerContainer, StaggerItem } from '@/components/page-transition'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { getUserQuotaDates } from '@/features/dashboard/api'
-import {
-  useSummaryCardsConfig,
-  type SummaryCardsVariant,
-} from '@/features/dashboard/hooks/use-dashboard-config'
+import { useSummaryCardsConfig } from '@/features/dashboard/hooks/use-dashboard-config'
 import type { QuotaDataItem } from '@/features/dashboard/types'
-import { getUserLogStats, getUserLogTokenStat } from '@/features/usage-logs/api'
-import type { LogTokenStat } from '@/features/usage-logs/types'
+import { getUserLogStats } from '@/features/usage-logs/api'
 import { useStatus } from '@/hooks/use-status'
 import { toIntlLocale } from '@/i18n/languages'
 import { getCurrencyLabel, isCurrencyDisplayEnabled } from '@/lib/currency'
@@ -48,8 +44,6 @@ const SUMMARY_CARD_TONES: Record<string, StatCardTone> = {
   usage: 'accent-2',
   requests: 'accent-3',
   lifetimeTokens: 'accent-4',
-  // Keeps the palette of the spend card it replaces on the usage logs page.
-  todayTokens: 'accent-2',
 }
 
 const DEFAULT_SUMMARY_CARD_TONE: StatCardTone = 'accent-4'
@@ -118,44 +112,15 @@ function sumTokenUsed(data: QuotaDataItem[]): number {
   return data.reduce((total, item) => total + (Number(item.token_used) || 0), 0)
 }
 
-const EMPTY_TOKEN_STAT: LogTokenStat = {
-  prompt_tokens: 0,
-  completion_tokens: 0,
-  cache_tokens: 0,
-}
-
-/**
- * The caption of the today-token card: "Input: 1.2K / Output: 300 / Cache: 12K".
- *
- * Every figure reuses the compact conversion of the dashboard stat cards, so a
- * long token total stays readable instead of unrolling into full digit runs.
- */
-function buildTokenBreakdown(
-  stat: LogTokenStat,
-  locale: string | undefined,
-  t: (key: string) => string
-): string {
-  const entries: Array<[string, number]> = [
-    [t('Input'), stat.prompt_tokens],
-    [t('Output'), stat.completion_tokens],
-    [t('Cache'), stat.cache_tokens],
-  ]
-
-  return entries
-    .map(([label, value]) => `${label}: ${formatCompactNumber(value, locale)}`)
-    .join(' / ')
-}
-
 interface SummaryCardsProps {
   /**
-   * `logs` swaps the spend card for the today-token card so the usage logs page
-   * never renders a currency figure.
+   * The usage logs page owns the page header, so it renders the cards straight
+   * onto the page instead of inside the bordered "usage at a glance" panel.
    */
-  variant?: SummaryCardsVariant
+  bare?: boolean
 }
 
 export function SummaryCards(props: SummaryCardsProps = {}) {
-  const variant = props.variant ?? 'overview'
   const { t, i18n } = useTranslation()
   const user = useOverviewAccount()
   const { status, loading } = useStatus()
@@ -200,22 +165,6 @@ export function SummaryCards(props: SummaryCardsProps = {}) {
     staleTime: 5 * 60 * 1000,
   })
 
-  // Only the usage logs page renders the today-token card, so the overview page
-  // never pays for this per-log scan.
-  const todayTokenQuery = useQuery({
-    queryKey: ['dashboard', 'overview', 'today-token-breakdown'],
-    queryFn: async () => {
-      const timeRange = computeTimeRange(0, undefined, undefined, true)
-      const result = await getUserLogTokenStat({
-        start_timestamp: timeRange.start_timestamp,
-        end_timestamp: timeRange.end_timestamp,
-      })
-      return result.success && result.data ? result.data : EMPTY_TOKEN_STAT
-    },
-    enabled: variant === 'logs',
-    staleTime: 60 * 1000,
-  })
-
   const currencyEnabledFromStore = isCurrencyDisplayEnabled()
   const statusCurrencyFlag =
     typeof status?.display_in_currency === 'boolean'
@@ -255,9 +204,6 @@ export function SummaryCards(props: SummaryCardsProps = {}) {
   const windowLabel = t(SUMMARY_WINDOW_LABEL_KEYS[summaryWindow])
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const lifetimeTokens = Number(lifetimeTokenQuery.data?.data?.token) || 0
-  const todayTokens = todayTokenQuery.data ?? EMPTY_TOKEN_STAT
-  const todayTokenTotal =
-    todayTokens.prompt_tokens + todayTokens.completion_tokens
 
   const windowToggle = (
     <ToggleGroup
@@ -281,7 +227,6 @@ export function SummaryCards(props: SummaryCardsProps = {}) {
   // Cards backed by their own request keep the skeleton until it settles.
   const cardQueryLoading: Record<string, boolean> = {
     lifetimeTokens: lifetimeTokenQuery.isLoading,
-    todayTokens: todayTokenQuery.isLoading,
   }
 
   const items = useSummaryCardsConfig({
@@ -292,9 +237,6 @@ export function SummaryCards(props: SummaryCardsProps = {}) {
     lifetimeTokenDisplay: formatNumber(lifetimeTokens),
     currencyEnabled,
     currencyLabel,
-    variant,
-    todayTokenDisplay: formatNumber(todayTokenTotal),
-    todayTokenBreakdown: buildTokenBreakdown(todayTokens, locale, t),
   }).map((config) => {
     return {
       key: config.key,
@@ -321,6 +263,34 @@ export function SummaryCards(props: SummaryCardsProps = {}) {
     }
   })
 
+  const grid = (
+    <StaggerContainer className='grid grid-cols-2 gap-1.5 sm:gap-3 xl:grid-cols-4'>
+      {items.map((it) => (
+        <StaggerItem
+          key={it.key}
+          className='bg-background/60 rounded-lg border px-2 py-1.5 sm:rounded-xl sm:p-3'
+        >
+          <StatCard
+            title={it.title}
+            value={it.value}
+            description={it.desc}
+            icon={it.icon}
+            tone={it.tone}
+            sparkline={it.sparkline}
+            sparklineVariant={it.sparklineVariant}
+            loading={it.loading}
+            action={it.action}
+            titleValue={it.titleValue}
+            compactMobile
+          />
+        </StaggerItem>
+      ))}
+    </StaggerContainer>
+  )
+
+  // The usage logs page must not repeat the panel chrome in its own layout.
+  if (props.bare) return grid
+
   return (
     <div className='bg-card overflow-hidden rounded-2xl border shadow-xs'>
       <div className='flex flex-col gap-2.5 p-3 sm:gap-3 sm:p-5'>
@@ -332,28 +302,7 @@ export function SummaryCards(props: SummaryCardsProps = {}) {
             {t('Monitor token usage and request volume')}
           </p>
         </div>
-        <StaggerContainer className='grid grid-cols-2 gap-1.5 sm:gap-3 xl:grid-cols-4'>
-          {items.map((it) => (
-            <StaggerItem
-              key={it.key}
-              className='bg-background/60 rounded-lg border px-2 py-1.5 sm:rounded-xl sm:p-3'
-            >
-              <StatCard
-                title={it.title}
-                value={it.value}
-                description={it.desc}
-                icon={it.icon}
-                tone={it.tone}
-                sparkline={it.sparkline}
-                sparklineVariant={it.sparklineVariant}
-                loading={it.loading}
-                action={it.action}
-                titleValue={it.titleValue}
-                compactMobile
-              />
-            </StaggerItem>
-          ))}
-        </StaggerContainer>
+        {grid}
       </div>
     </div>
   )

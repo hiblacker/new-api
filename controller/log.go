@@ -155,22 +155,3 @@ func GetLogsSelfStat(c *gin.Context) {
 	})
 	return
 }
-
-// GetLogsSelfTokenStat reports the prompt/completion/cache split of the
-// caller's own consume logs. The overview and usage logs pages render it as the
-// today-token card, which is why it is scoped to a time range only.
-func GetLogsSelfTokenStat(c *gin.Context) {
-	username := c.GetString("username")
-	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
-	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
-	breakdown, err := model.SumUsedTokenBreakdown(startTimestamp, endTimestamp, username)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data":    breakdown,
-	})
-}

@@ -29,9 +29,7 @@ import { useSidebarConfig } from '@/hooks/use-sidebar-config'
 
 import { UserInfoDialog } from './components/dialogs/user-info-dialog'
 import {
-  type LogsViewScope,
   UsageLogsProvider,
-  useLogsViewScope,
   useUsageLogsContext,
 } from './components/usage-logs-provider'
 import { UsageLogsTable } from './components/usage-logs-table'
@@ -72,7 +70,6 @@ function UsageLogsContent() {
     affinityDialogOpen,
     setAffinityDialogOpen,
   } = useUsageLogsContext()
-  const { canManageScope, viewScope, setViewScope } = useLogsViewScope()
   const tabNavGroups = useMemo<NavGroup[]>(
     () => [
       {
@@ -109,36 +106,19 @@ function UsageLogsContent() {
     [navigate]
   )
 
-  const handleViewScopeChange = useCallback(
-    (scope: string) => {
-      if (scope === 'all' || scope === 'self') {
-        setViewScope(scope as LogsViewScope)
-      }
-    },
-    [setViewScope]
-  )
-
-  const pageMeta =
-    activeCategory === 'common' ? SECTION_META.common : SECTION_META.task
-  const showTaskSwitcher =
-    activeCategory !== 'common' && visibleSections.length > 1
+  // The common section renders no page header of its own; the task sections
+  // keep theirs because the switcher sits next to it.
+  const isCommonSection = activeCategory === 'common'
+  const showTaskSwitcher = !isCommonSection && visibleSections.length > 1
 
   return (
     <>
       <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>
-          {t(pageMeta.titleKey)}
-        </SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
-          {canManageScope && (
-            <Tabs value={viewScope} onValueChange={handleViewScopeChange}>
-              <TabsList>
-                <TabsTrigger value='all'>{t('All')}</TabsTrigger>
-                <TabsTrigger value='self'>{t('Only Mine')}</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          )}
-        </SectionPageLayout.Actions>
+        {!isCommonSection && (
+          <SectionPageLayout.Title>
+            {t(SECTION_META.task.titleKey)}
+          </SectionPageLayout.Title>
+        )}
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
             {showTaskSwitcher && (
@@ -153,7 +133,7 @@ function UsageLogsContent() {
               </Tabs>
             )}
             {/* Token usage only exists for text (common) logs. */}
-            {activeCategory === 'common' && <SummaryCards variant='logs' />}
+            {isCommonSection && <SummaryCards bare />}
             <div className='min-h-0 flex-1'>
               <UsageLogsTable logCategory={activeCategory} />
             </div>
