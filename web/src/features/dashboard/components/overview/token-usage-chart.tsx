@@ -39,7 +39,6 @@ import {
 import { useTheme } from '@/context/theme-provider'
 import { getUserQuotaDates } from '@/features/dashboard/api'
 import { SectionDivider } from '@/features/dashboard/components/ui/section-divider'
-import { useRefreshCooldown } from '@/features/dashboard/hooks/use-refresh-cooldown'
 import { useVChartTheme } from '@/features/dashboard/hooks/use-vchart-theme'
 import { getDashboardChartColors } from '@/features/dashboard/lib/charts'
 import {
@@ -59,6 +58,7 @@ import {
   type TokenUsageRangeKey,
   type TokenUsageSettings,
 } from '@/features/dashboard/lib/token-usage'
+import { useRefreshCooldown } from '@/hooks/use-refresh-cooldown'
 import { formatCompactNumber, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { VCHART_OPTION } from '@/lib/vchart'

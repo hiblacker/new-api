@@ -46,7 +46,7 @@ vi.mock('@visactor/vchart', () => ({
   ThemeManager: { setCurrentTheme: vi.fn() },
 }))
 
-const STORAGE_KEY = 'dashboard_overview_refresh_settings'
+const STORAGE_KEY = 'dashboard_refresh_settings'
 let client: QueryClient
 let requestCount: number
 let tokenCount: number

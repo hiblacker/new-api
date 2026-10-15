@@ -67,6 +67,10 @@ Choose the time range and how usage is aggregated into buckets.
 
 Per Hour / Per Day / Per Week / Per Month      ← 粒度专用，勿改用 Week/Month
 Granularity:                                    ← 头部「粒度：X」
+
+Refresh overview / Refreshing... / Refresh settings / Auto refresh / Refresh interval (seconds)
+Choose whether and how often to refresh the overview automatically.
+Refresh usage logs / Choose whether and how often to refresh the usage logs automatically.
 ```
 
 > ⚠️ 粒度标签**必须**用 `Per Hour` / `Per Day` / `Per Week` / `Per Month`。
@@ -78,6 +82,7 @@ Granularity:                                    ← 头部「粒度：X」
 
 | 文件 | 改动 |
 |---|---|
+| `components/refresh-controls.tsx` | **新增**，概览页与使用日志页共用的刷新控件（手动刷新 + 自动刷新设置），共用偏好键 `dashboard_refresh_settings` |
 | `components/ui/stat-card.tsx` | `StatCardTone` 扩展 `accent-4`；标题在存在 `action` 时正确截断；新增可选 `titleValue`（标题右侧的带单位数值） |
 | `styles/theme.css`、`theme-presets.css` | 新增 `--overview-accent-4` |
 | `components/ui/section-divider.tsx` | **新增**，两个筛选弹窗共用（`models-filter-dialog` 已改为复用它） |
@@ -120,13 +125,23 @@ bun run build && cd .. && go build ./...
 
 ---
 
-## 6. 概览页刷新控件
+## 6. 页面刷新控件（概览页 + 使用日志页共用）
 
-- `components/overview/overview-refresh-controls.tsx`：概览页右上角「手动刷新 + 刷新设置」两个按钮。
-  手动刷新走 `refetchQueries`（保留旧数据，不闪空白）；自动刷新按 `dashboard/overview/*`、
-  `status`、`perf-metrics-summary` 这几个查询前缀重取。开关与间隔（10/15/30/60/120/300 秒）
-  存在 localStorage `dashboard_overview_refresh_settings`，默认开启、30 秒，页面不可见时跳过。
-- `hooks/use-refresh-cooldown.ts`：点击后维持 2 秒最短忙碌态，否则「点完看不出反应」。
+- `components/refresh-controls.tsx`：**通用**刷新控件（手动刷新按钮 + 刷新设置弹窗），
+  调用方传入 `queries`（哪些查询参与刷新，手动与自动都用它）与 `label` / `description`
+  （按钮 aria-label 与弹窗说明，各页自己的文案）。
+  手动刷新走 `refetchQueries`（保留旧数据，不闪空白）；自动刷新按间隔重取；开关与间隔
+  （10/15/30/60/120/300 秒）存在 localStorage
+  **`dashboard_refresh_settings`**——两个页面共用同一份偏好，默认开启、30 秒，页面不可见时跳过。
+- `hooks/use-refresh-cooldown.ts`（从 `features/dashboard/hooks/` 移到通用 `hooks/`）：
+  点击后维持 2 秒最短忙碌态，否则「点完看不出反应」。
+- 各页包装组件（只定义查询范围与文案）：
+  - `features/dashboard/components/overview/overview-refresh-controls.tsx`：
+    `dashboard/overview/*`、`status`、`perf-metrics-summary`
+  - `features/usage-logs/components/usage-logs-refresh-controls.tsx`：`logs`、`usage-logs-stats`、
+    `dashboard/overview/*`（该页复用了概览卡片）、`status`
+- 位置：概览页在页面标题右侧的 Actions；使用日志页在筛选工具栏右侧的操作区
+  （Common 与绘图／任务两套工具栏都挂了，走 `LogsFilterToolbar.actionStart`）。
 - `hooks/use-overview-account.ts`：概览页统一取当前账号（`/api/user/self` 兜底 auth store）。
 - `uptime-panel.tsx`、`token-usage-chart.tsx`：从手写 `useEffect` 改为 react-query，
   这样刷新控件能按前缀一起重取。
