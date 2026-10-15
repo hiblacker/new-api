@@ -41,6 +41,8 @@ export interface StatCardDetail {
 interface StatCardProps {
   title: string
   value: string | number
+  /** Unit-formatted figure rendered beside the title, e.g. "1.2M". */
+  titleValue?: string
   description: string
   icon: LucideIcon
   sparkline?: number[]
@@ -325,6 +327,11 @@ export function StatCard(props: StatCardProps) {
             {props.title}
           </span>
         </div>
+        {props.titleValue && (
+          <span className='text-muted-foreground/70 shrink-0 font-mono text-[10px] font-medium tabular-nums sm:text-xs'>
+            {props.titleValue}
+          </span>
+        )}
         {props.action && <div className='shrink-0'>{props.action}</div>}
       </div>
 

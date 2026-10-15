@@ -694,6 +694,76 @@ func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	return token
 }
 
+// TokenUsageBreakdown is the prompt/completion/cache token split of the
+// matching consume logs.
+type TokenUsageBreakdown struct {
+	PromptTokens     int64 `json:"prompt_tokens"`
+	CompletionTokens int64 `json:"completion_tokens"`
+	CacheTokens      int64 `json:"cache_tokens"`
+}
+
+// SumUsedTokenBreakdown reports the same traffic as SumUsedToken and adds the
+// prompt/completion split plus the cached prompt tokens.
+//
+// Cached tokens are not a column: they only exist inside the `other` JSON
+// payload, so they are summed while streaming the matching rows. Aggregating
+// them in SQL would need a different JSON expression (plus an invalid-payload
+// guard) per supported database, and malformed legacy payloads must never fail
+// the query.
+func SumUsedTokenBreakdown(startTimestamp int64, endTimestamp int64, username string) (TokenUsageBreakdown, error) {
+	var breakdown TokenUsageBreakdown
+
+	tx := LOG_DB.Table("logs").
+		Select("prompt_tokens, completion_tokens, other").
+		Where("type = ?", LogTypeConsume)
+	if username != "" {
+		tx = tx.Where("username = ?", username)
+	}
+	if startTimestamp != 0 {
+		tx = tx.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		tx = tx.Where("created_at <= ?", endTimestamp)
+	}
+
+	rows, err := tx.Rows()
+	if err != nil {
+		return breakdown, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var promptTokens, completionTokens int
+		var other string
+		if err := rows.Scan(&promptTokens, &completionTokens, &other); err != nil {
+			return breakdown, err
+		}
+		breakdown.PromptTokens += int64(promptTokens)
+		breakdown.CompletionTokens += int64(completionTokens)
+		breakdown.CacheTokens += logOtherCacheTokens(other)
+	}
+
+	return breakdown, rows.Err()
+}
+
+// logOtherCacheTokens reads the cached prompt tokens of a log `other` payload,
+// tolerating empty, malformed and legacy-shaped values.
+func logOtherCacheTokens(other string) int64 {
+	if other == "" {
+		return 0
+	}
+	var payload struct {
+		CacheTokens *float64 `json:"cache_tokens"`
+	}
+	if err := common.UnmarshalJsonStr(other, &payload); err != nil {
+		return 0
+	}
+	if payload.CacheTokens == nil {
+		return 0
+	}
+	return int64(*payload.CacheTokens)
+}
+
 func CountOldLog(ctx context.Context, targetTimestamp int64) (int64, error) {
 	var total int64
 	if err := LOG_DB.WithContext(ctx).Model(&Log{}).Where("created_at < ?", targetTimestamp).Count(&total).Error; err != nil {

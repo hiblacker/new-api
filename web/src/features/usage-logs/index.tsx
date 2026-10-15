@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { SectionPageLayout } from '@/components/layout'
 import type { NavGroup } from '@/components/layout/types'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { SummaryCards } from '@/features/dashboard/components/overview/summary-cards'
 import { CacheStatsDialog } from '@/features/system-settings/general/channel-affinity/cache-stats-dialog'
 import { useSidebarConfig } from '@/hooks/use-sidebar-config'
 
@@ -151,6 +152,8 @@ function UsageLogsContent() {
                 </TabsList>
               </Tabs>
             )}
+            {/* Token usage only exists for text (common) logs. */}
+            {activeCategory === 'common' && <SummaryCards variant='logs' />}
             <div className='min-h-0 flex-1'>
               <UsageLogsTable logCategory={activeCategory} />
             </div>

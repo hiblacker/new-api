@@ -25,6 +25,7 @@ import type {
   GetLogsResponse,
   GetLogStatsParams,
   GetLogStatsResponse,
+  GetLogTokenStatResponse,
   GetMidjourneyLogsParams,
   GetTaskLogsParams,
   TaskArtifactsResponse,
@@ -68,6 +69,14 @@ async function fetchLogStats<T>(
   return res.data
 }
 
+async function fetchLogTokenStat<T>(params: T): Promise<GetLogTokenStatResponse> {
+  const queryParams = buildQueryParams(
+    params as unknown as Record<string, unknown>
+  )
+  const res = await api.get(`/api/log/self/token_stat?${queryParams}`)
+  return res.data
+}
+
 // ============================================================================
 // Common Log APIs
 // ============================================================================
@@ -85,6 +94,12 @@ export const getLogStats = (params: GetLogStatsParams = {}) =>
 export const getUserLogStats = (
   params: Omit<GetLogStatsParams, 'username' | 'channel'> = {}
 ) => fetchLogStats('/api/log', params, false)
+
+// The today-token card only needs a time range: the endpoint is scoped to the
+// signed-in user and ignores the log list filters on purpose.
+export const getUserLogTokenStat = (
+  params: Pick<GetLogStatsParams, 'start_timestamp' | 'end_timestamp'> = {}
+) => fetchLogTokenStat(params)
 
 export async function getUserInfo(
   userId: number

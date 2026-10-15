@@ -23,12 +23,17 @@ import { useTranslation } from 'react-i18next'
 import { StaggerContainer, StaggerItem } from '@/components/page-transition'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { getUserQuotaDates } from '@/features/dashboard/api'
-import { useSummaryCardsConfig } from '@/features/dashboard/hooks/use-dashboard-config'
+import {
+  useSummaryCardsConfig,
+  type SummaryCardsVariant,
+} from '@/features/dashboard/hooks/use-dashboard-config'
 import type { QuotaDataItem } from '@/features/dashboard/types'
-import { getUserLogStats } from '@/features/usage-logs/api'
+import { getUserLogStats, getUserLogTokenStat } from '@/features/usage-logs/api'
+import type { LogTokenStat } from '@/features/usage-logs/types'
 import { useStatus } from '@/hooks/use-status'
+import { toIntlLocale } from '@/i18n/languages'
 import { getCurrencyLabel, isCurrencyDisplayEnabled } from '@/lib/currency'
-import { formatNumber, formatQuota } from '@/lib/format'
+import { formatCompactNumber, formatNumber, formatQuota } from '@/lib/format'
 import { computeTimeRange } from '@/lib/time'
 
 import { useOverviewAccount } from '../../hooks/use-overview-account'
@@ -43,6 +48,8 @@ const SUMMARY_CARD_TONES: Record<string, StatCardTone> = {
   usage: 'accent-2',
   requests: 'accent-3',
   lifetimeTokens: 'accent-4',
+  // Keeps the palette of the spend card it replaces on the usage logs page.
+  todayTokens: 'accent-2',
 }
 
 const DEFAULT_SUMMARY_CARD_TONE: StatCardTone = 'accent-4'
@@ -111,8 +118,45 @@ function sumTokenUsed(data: QuotaDataItem[]): number {
   return data.reduce((total, item) => total + (Number(item.token_used) || 0), 0)
 }
 
-export function SummaryCards() {
-  const { t } = useTranslation()
+const EMPTY_TOKEN_STAT: LogTokenStat = {
+  prompt_tokens: 0,
+  completion_tokens: 0,
+  cache_tokens: 0,
+}
+
+/**
+ * The caption of the today-token card: "Input: 1.2K / Output: 300 / Cache: 12K".
+ *
+ * Every figure reuses the compact conversion of the dashboard stat cards, so a
+ * long token total stays readable instead of unrolling into full digit runs.
+ */
+function buildTokenBreakdown(
+  stat: LogTokenStat,
+  locale: string | undefined,
+  t: (key: string) => string
+): string {
+  const entries: Array<[string, number]> = [
+    [t('Input'), stat.prompt_tokens],
+    [t('Output'), stat.completion_tokens],
+    [t('Cache'), stat.cache_tokens],
+  ]
+
+  return entries
+    .map(([label, value]) => `${label}: ${formatCompactNumber(value, locale)}`)
+    .join(' / ')
+}
+
+interface SummaryCardsProps {
+  /**
+   * `logs` swaps the spend card for the today-token card so the usage logs page
+   * never renders a currency figure.
+   */
+  variant?: SummaryCardsVariant
+}
+
+export function SummaryCards(props: SummaryCardsProps = {}) {
+  const variant = props.variant ?? 'overview'
+  const { t, i18n } = useTranslation()
   const user = useOverviewAccount()
   const { status, loading } = useStatus()
   const [summaryWindow, setSummaryWindow] = useState<SummaryWindow>('today')
@@ -156,6 +200,22 @@ export function SummaryCards() {
     staleTime: 5 * 60 * 1000,
   })
 
+  // Only the usage logs page renders the today-token card, so the overview page
+  // never pays for this per-log scan.
+  const todayTokenQuery = useQuery({
+    queryKey: ['dashboard', 'overview', 'today-token-breakdown'],
+    queryFn: async () => {
+      const timeRange = computeTimeRange(0, undefined, undefined, true)
+      const result = await getUserLogTokenStat({
+        start_timestamp: timeRange.start_timestamp,
+        end_timestamp: timeRange.end_timestamp,
+      })
+      return result.success && result.data ? result.data : EMPTY_TOKEN_STAT
+    },
+    enabled: variant === 'logs',
+    staleTime: 60 * 1000,
+  })
+
   const currencyEnabledFromStore = isCurrencyDisplayEnabled()
   const statusCurrencyFlag =
     typeof status?.display_in_currency === 'boolean'
@@ -193,6 +253,11 @@ export function SummaryCards() {
   )
 
   const windowLabel = t(SUMMARY_WINDOW_LABEL_KEYS[summaryWindow])
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const lifetimeTokens = Number(lifetimeTokenQuery.data?.data?.token) || 0
+  const todayTokens = todayTokenQuery.data ?? EMPTY_TOKEN_STAT
+  const todayTokenTotal =
+    todayTokens.prompt_tokens + todayTokens.completion_tokens
 
   const windowToggle = (
     <ToggleGroup
@@ -213,14 +278,23 @@ export function SummaryCards() {
     </ToggleGroup>
   )
 
+  // Cards backed by their own request keep the skeleton until it settles.
+  const cardQueryLoading: Record<string, boolean> = {
+    lifetimeTokens: lifetimeTokenQuery.isLoading,
+    todayTokens: todayTokenQuery.isLoading,
+  }
+
   const items = useSummaryCardsConfig({
     windowTokenDisplay: formatNumber(windowTokens),
     windowLabel,
     usedDisplay: formatQuota(usedQuota),
     requestCountDisplay: formatNumber(requestCount),
-    lifetimeTokenDisplay: formatNumber(lifetimeTokenQuery.data?.data?.token),
+    lifetimeTokenDisplay: formatNumber(lifetimeTokens),
     currencyEnabled,
     currencyLabel,
+    variant,
+    todayTokenDisplay: formatNumber(todayTokenTotal),
+    todayTokenBreakdown: buildTokenBreakdown(todayTokens, locale, t),
   }).map((config) => {
     return {
       key: config.key,
@@ -229,10 +303,7 @@ export function SummaryCards() {
       desc: config.description,
       icon: config.icon,
       tone: SUMMARY_CARD_TONES[config.key] ?? DEFAULT_SUMMARY_CARD_TONE,
-      loading:
-        config.key === 'lifetimeTokens'
-          ? loading || lifetimeTokenQuery.isLoading
-          : loading,
+      loading: loading || (cardQueryLoading[config.key] ?? false),
       sparkline: getSummarySparkline(
         config.key,
         windowSparklines,
@@ -241,6 +312,12 @@ export function SummaryCards() {
       sparklineVariant: 'line' as const,
       // The window switcher belongs to the windowed token card.
       action: config.key === 'windowTokens' ? windowToggle : undefined,
+      // Abbreviated all-time total beside the title; the full grouped figure
+      // stays as the card value below.
+      titleValue:
+        config.key === 'lifetimeTokens' && lifetimeTokens > 0
+          ? formatCompactNumber(lifetimeTokens, locale)
+          : undefined,
     }
   })
 
@@ -271,6 +348,7 @@ export function SummaryCards() {
                 sparklineVariant={it.sparklineVariant}
                 loading={it.loading}
                 action={it.action}
+                titleValue={it.titleValue}
                 compactMobile
               />
             </StaggerItem>
