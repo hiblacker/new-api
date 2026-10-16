@@ -8,7 +8,7 @@
 - NAS 已安装 Container Manager，并已启用 SSH。
 - NAS 上已有可正常运行的 `compose.yaml` 和 `.env`。
 - Compose 中的应用服务名为 `new-api`，数据库服务名为 `postgres`。
-- DSM 登录账号可以通过 `sudo` 执行 root 命令。
+- DSM 登录账号已配置**免密 sudo**，即 `ssh <账号>@<NAS> 'sudo -n true'` 无提示返回。
 
 部署脚本不会执行 `docker compose down -v`，不会删除数据卷。
 
@@ -33,10 +33,12 @@ NAS_COMPOSE_FILE=compose.yaml
 NAS_API_URL=http://192.168.1.10:53130
 
 IMAGE_NAME=new-api
-IMAGE_TAG=
+IMAGE_TAG="v1.0.0-rc.36-custom.$(date +%Y%m%d%H%M)"
 ```
 
-`IMAGE_TAG` 留空时，每次部署自动生成 `local-YYYYMMDD-HHMMSS`。只有需要固定版本名时才填写。`deploy/nas.env` 已被 Git 忽略。
+`IMAGE_TAG` 支持三种写法：带时间戳的版本名（推荐，上面这种每次部署都会展开成
+`v1.0.0-rc.36-custom.202610161006` 这类唯一标签）、固定版本名（如 `v1.0.0-rc.36-custom.2`）、
+留空（自动生成 `local-YYYYMMDD-HHMMSS`）。`deploy/nas.env` 已被 Git 忽略。
 
 如果尚未配置 SSH 密钥：
 
@@ -86,7 +88,7 @@ docker pull docker.m.daocloud.io/library/debian:bookworm-slim
 2. 将 `remote-deploy.sh` 上传到 NAS。
 3. 在本机构建并导出镜像。
 4. 通过 SCP 将压缩镜像传到 NAS。
-5. 提示输入一次 NAS sudo 密码。
+5. 以 root 权限上线（免密 sudo，全程无密码提示）。
 6. 记录回滚镜像、备份 PostgreSQL、载入新镜像并重建应用容器。
 7. 检查 `/api/status`；新版本不健康时自动回滚。
 
@@ -118,7 +120,18 @@ docker pull docker.m.daocloud.io/library/debian:bookworm-slim
 
 ### NAS 上提示需要 root
 
-脚本只在上线阶段调用一次 sudo。输入 DSM 登录账号的 sudo 密码即可；不需要配置免密 sudo。
+脚本只在上线阶段以 root 调用一次远端脚本，**需要 NAS 部署账号配置免密 sudo**。
+在 DSM 上执行 `sudo visudo`（或往 `/etc/sudoers.d/` 放一份独立配置）加入：
+
+```text
+<DSM 账号> ALL=(ALL) NOPASSWD: ALL
+```
+
+验证：
+
+```bash
+ssh <账号>@<NAS> -p <端口> 'sudo -n true' && echo 免密 OK
+```
 
 ### 部署失败后的检查
 

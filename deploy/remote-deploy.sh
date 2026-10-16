@@ -2,8 +2,8 @@
 # new-api · NAS 侧特权部署脚本
 #
 # 在 NAS 上以 root 运行。正常情况下你不需要手敲它 ——
-# 本地 `./deploy/nas.sh deploy` 会通过**一次** `ssh -t` 调用本脚本，
-# 你只需要在弹出的 sudo 提示里输一次密码。
+# 本地 `./deploy/nas.sh deploy` 会通过一次 ssh 调用本脚本。
+# NAS 部署账号已配置**免密 sudo**（NOPASSWD），因此不会出现任何密码提示。
 #
 # 手动用法（在 NAS 上）：
 #   sudo /volume1/docker/new-apiv1/deploy/remote-deploy.sh deploy new-api:v1.0.0-rc.36-custom.1

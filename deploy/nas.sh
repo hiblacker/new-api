@@ -15,8 +15,9 @@
 #
 # 权限模型：
 #   本地只做「构建 + 传输」；所有 docker 操作都由 NAS 上的
-#   deploy/remote-deploy.sh 以 root 执行。整条链路只会有**一次** sudo 提示
-#   （deploy/rollback/backup/... 时），你输一次密码，脚本即一次做完并退出。
+#   deploy/remote-deploy.sh 以 root 执行。NAS 部署账号已配置**免密 sudo**
+#   （NOPASSWD），整条链路不会出现任何密码提示，可在 cron / CI 等
+#   无终端环境下直接运行。
 #
 # 安全约定：任何路径都不会执行 `docker compose down -v`（数据卷是红线）。
 #
@@ -67,12 +68,13 @@ load_env() {
 nas_ssh() { ssh "${SSH_OPTS[@]}" "${NAS_SSH_USER}@${NAS_HOST}" "$@"; }
 nas_scp() { scp "${SCP_OPTS[@]}" "$@"; }
 
-# 需要 root 的动作：一次 ssh -t，sudo 在 TTY 上提示一次密码
+# 需要 root 的动作：直接 ssh 调用远端脚本。
+# ★ 不加 -t：远程 sudo 是免密的，不需要 TTY，这样脚本也能在无终端环境跑。
 nas_sudo() { # action [arg]
   local action="$1" arg="${2:-}" cmd
   cmd="sudo '$NAS_DEPLOY_DIR/deploy/remote-deploy.sh' '$action'"
   [ -n "$arg" ] && cmd="$cmd '$arg'"
-  ssh -t "${SSH_OPTS[@]}" "${NAS_SSH_USER}@${NAS_HOST}" "$cmd"
+  ssh "${SSH_OPTS[@]}" "${NAS_SSH_USER}@${NAS_HOST}" "$cmd"
 }
 
 # ------------------------------------------------------------------- 本机
@@ -221,7 +223,7 @@ cmd_check() {
 
   echo
   ok "自检完成。执行 ./deploy/nas.sh deploy 即可一键部署"
-  echo "  （构建在本机进行；上线阶段会在 NAS 上提示一次 sudo 密码）"
+  echo "  （构建在本机进行；上线阶段在 NAS 上以 root 执行，免密 sudo）"
 }
 
 cmd_build() {
@@ -268,7 +270,7 @@ cmd_deploy() {
 
   # 4) 上线：全部 docker 操作合并成一次 sudo
   echo
-  log "在 NAS 上执行部署 —— 接下来会提示输入一次 sudo 密码"
+  log "在 NAS 上执行部署（以 root 运行，免密 sudo）"
   if ! nas_sudo deploy "${IMAGE_NAME}:${IMAGE_TAG}"; then
     die "部署失败。完整日志在 NAS：$NAS_DEPLOY_DIR/deploy/remote-deploy.log
    也可执行 ./deploy/nas.sh logs 查看容器输出。"
@@ -293,32 +295,32 @@ cmd_deploy() {
 
 cmd_rollback() {
   load_env
-  log "回滚到上一个成功部署的镜像（会提示一次 sudo 密码）…"
+  log "回滚到上一个成功部署的镜像（以 root 运行，免密 sudo）…"
   nas_sudo rollback || die "回滚失败，详见上面的输出"
   ok "回滚完成"
 }
 
 cmd_backup() {
   load_env
-  log "在 NAS 上备份数据库（会提示一次 sudo 密码）…"
+  log "在 NAS 上备份数据库（以 root 运行，免密 sudo）…"
   nas_sudo backup || die "备份失败"
 }
 
 cmd_recon() {
   load_env
-  log "采集 NAS 信息（会提示一次 sudo 密码）…"
+  log "采集 NAS 信息（以 root 运行，免密 sudo）…"
   nas_sudo recon || die "采集失败"
 }
 
 cmd_logs() {
   load_env
-  log "读取 new-api 容器日志（会提示一次 sudo 密码）…"
+  log "读取 new-api 容器日志（以 root 运行，免密 sudo）…"
   nas_sudo logs || die "读取日志失败"
 }
 
 cmd_prune() {
   load_env
-  log "清理 NAS 上的悬空镜像与构建缓存（会提示一次 sudo 密码）…"
+  log "清理 NAS 上的悬空镜像与构建缓存（以 root 运行，免密 sudo）…"
   nas_sudo prune || die "清理失败"
 }
 
