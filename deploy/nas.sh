@@ -134,6 +134,37 @@ dockerfile_args() {
   fi
 }
 
+# ------------------------------------------------------------ 构建期版本戳
+# 上游的 VERSION 是**空文件**（commit f4450040b "add a blank VERSION file"），
+# 真实版本由 CI 在构建时写进去：
+#   docker-build.yml         → echo "${TAG}" > VERSION
+#   docker-image-branch.yml  → echo "${VERSION}" > VERSION
+# 本地 docker build 没人写它，于是：
+#   - 后端 common.Version 为空 → /api/status 的 version 为空
+#   - 前端 VITE_REACT_APP_VERSION 为空
+#   → 标题栏（components/layout/components/system-brand.tsx）退化成「未知版本」
+# 这里在构建前用镜像 tag 临时戳上，构建后（含中断）还原，保持工作区干净。
+VERSION_BAK=""
+stamp_version() {
+  VERSION_BAK="$(cat "$ROOT_DIR/VERSION" 2>/dev/null || true)"
+  printf '%s' "$IMAGE_TAG" > "$ROOT_DIR/VERSION"
+}
+unstamp_version() {
+  # 上游是 0 字节空文件，printf '' 正好还原成 0 字节
+  printf '%s' "$VERSION_BAK" > "$ROOT_DIR/VERSION"
+}
+
+# 构建镜像：自动戳/还原 VERSION
+build_image() {
+  local rc=0
+  stamp_version
+  trap 'unstamp_version' EXIT INT TERM
+  ( cd "$ROOT_DIR" && docker build "${DOCKERFILE_ARGS[@]}" -t "${IMAGE_NAME}:${IMAGE_TAG}" . ) || rc=$?
+  trap - EXIT INT TERM
+  unstamp_version
+  return "$rc"
+}
+
 # ------------------------------------------------------------------- 子命令
 cmd_init_key() {
   local key="${NAS_SSH_KEY:-$HOME/.ssh/id_ed25519_newapi_nas}"
@@ -231,9 +262,8 @@ cmd_build() {
   require_local_docker
   dockerfile_args "$@"
   log "构建 ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKERFILE_LABEL}…"
-  ( cd "$ROOT_DIR" && docker build "${DOCKERFILE_ARGS[@]}" -t "${IMAGE_NAME}:${IMAGE_TAG}" . ) \
-    || die "镜像构建失败"
-  ok "构建完成"
+  build_image || die "镜像构建失败"
+  ok "构建完成（版本戳 ${IMAGE_TAG}）"
 }
 
 cmd_deploy() {
@@ -250,8 +280,7 @@ cmd_deploy() {
   # 2) 本机构建
   dockerfile_args "$@"
   log "构建 ${IMAGE_NAME}:${IMAGE_TAG}${DOCKERFILE_LABEL}（首次需拉取基础镜像，可能较慢）…"
-  ( cd "$ROOT_DIR" && docker build "${DOCKERFILE_ARGS[@]}" -t "${IMAGE_NAME}:${IMAGE_TAG}" . ) \
-    || die "镜像构建失败。若卡在拉取基础镜像，可改用：
+  build_image || die "镜像构建失败。若卡在拉取基础镜像，可改用：
      ./deploy/nas.sh deploy --mirror"
 
   # 3) 导出并投递
