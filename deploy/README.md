@@ -23,14 +23,14 @@ cp deploy/nas.env.example deploy/nas.env
 修改 `deploy/nas.env`：
 
 ```dotenv
-NAS_HOST=192.168.1.10
+NAS_HOST=192.168.1.x
 NAS_SSH_PORT=22
 NAS_SSH_USER=<DSM 登录账号>
 NAS_SSH_KEY=~/.ssh/id_ed25519_newapi_nas
 
-NAS_DEPLOY_DIR=/volume1/docker/new-apiv1
+NAS_DEPLOY_DIR=/volume1/docker/new-api
 NAS_COMPOSE_FILE=compose.yaml
-NAS_API_URL=http://192.168.1.10:53130
+NAS_API_URL=http://192.168.1.x:3000
 
 IMAGE_NAME=new-api
 IMAGE_TAG="v1.0.0-rc.36-custom.$(date +%Y%m%d%H%M)"

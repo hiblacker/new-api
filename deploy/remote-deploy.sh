@@ -6,7 +6,7 @@
 # NAS 部署账号已配置**免密 sudo**（NOPASSWD），因此不会出现任何密码提示。
 #
 # 手动用法（在 NAS 上）：
-#   sudo /volume1/docker/new-apiv1/deploy/remote-deploy.sh deploy new-api:v1.0.0-rc.36-custom.1
+#   sudo /volume1/docker/new-api/deploy/remote-deploy.sh deploy new-api:v1.0.0-rc.36-custom.1
 #   sudo .../remote-deploy.sh rollback
 #   sudo .../remote-deploy.sh backup
 #   sudo .../remote-deploy.sh recon
