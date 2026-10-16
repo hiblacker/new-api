@@ -23,14 +23,13 @@ import { useTranslation } from 'react-i18next'
 import { SectionPageLayout } from '@/components/layout'
 import type { NavGroup } from '@/components/layout/types'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { SummaryCards } from '@/features/dashboard/components/overview/summary-cards'
 import { CacheStatsDialog } from '@/features/system-settings/general/channel-affinity/cache-stats-dialog'
 import { useSidebarConfig } from '@/hooks/use-sidebar-config'
 
 import { UserInfoDialog } from './components/dialogs/user-info-dialog'
 import {
-  type LogsViewScope,
   UsageLogsProvider,
-  useLogsViewScope,
   useUsageLogsContext,
 } from './components/usage-logs-provider'
 import { UsageLogsTable } from './components/usage-logs-table'
@@ -71,7 +70,6 @@ function UsageLogsContent() {
     affinityDialogOpen,
     setAffinityDialogOpen,
   } = useUsageLogsContext()
-  const { canManageScope, viewScope, setViewScope } = useLogsViewScope()
   const tabNavGroups = useMemo<NavGroup[]>(
     () => [
       {
@@ -108,36 +106,19 @@ function UsageLogsContent() {
     [navigate]
   )
 
-  const handleViewScopeChange = useCallback(
-    (scope: string) => {
-      if (scope === 'all' || scope === 'self') {
-        setViewScope(scope as LogsViewScope)
-      }
-    },
-    [setViewScope]
-  )
-
-  const pageMeta =
-    activeCategory === 'common' ? SECTION_META.common : SECTION_META.task
-  const showTaskSwitcher =
-    activeCategory !== 'common' && visibleSections.length > 1
+  // The common section renders no page header of its own; the task sections
+  // keep theirs because the switcher sits next to it.
+  const isCommonSection = activeCategory === 'common'
+  const showTaskSwitcher = !isCommonSection && visibleSections.length > 1
 
   return (
     <>
       <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>
-          {t(pageMeta.titleKey)}
-        </SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
-          {canManageScope && (
-            <Tabs value={viewScope} onValueChange={handleViewScopeChange}>
-              <TabsList>
-                <TabsTrigger value='all'>{t('All')}</TabsTrigger>
-                <TabsTrigger value='self'>{t('Only Mine')}</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          )}
-        </SectionPageLayout.Actions>
+        {!isCommonSection && (
+          <SectionPageLayout.Title>
+            {t(SECTION_META.task.titleKey)}
+          </SectionPageLayout.Title>
+        )}
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
             {showTaskSwitcher && (
@@ -151,6 +132,8 @@ function UsageLogsContent() {
                 </TabsList>
               </Tabs>
             )}
+            {/* Token usage only exists for text (common) logs. */}
+            {isCommonSection && <SummaryCards bare />}
             <div className='min-h-0 flex-1'>
               <UsageLogsTable logCategory={activeCategory} />
             </div>

@@ -1,0 +1,71 @@
+# 受限网络下的本地构建文件
+#
+# 与仓库根目录的 Dockerfile **完全等价**，只把三个基础镜像指向可达的镜像源。
+# 仅在 Docker Hub（auth.docker.io / registry-1.docker.io）不可达时使用。
+#
+#   docker build -f deploy/Dockerfile.mirror -t new-api:<tag> .
+#
+# 也可以换镜像源：
+#   docker build -f deploy/Dockerfile.mirror \
+#     --build-arg REGISTRY_MIRROR=docker.jianmuhub.com -t new-api:<tag> .
+#
+# 三个基础镜像只使用版本标签，便于在受限网络下手动拉取。
+
+# 基础镜像源（Docker Hub 不可达时使用）
+ARG REGISTRY_MIRROR=docker.m.daocloud.io
+# Debian 软件源（官方 deb.debian.org 实测仅 ~200KB/s 且会 502）
+ARG APT_MIRROR=mirrors.ustc.edu.cn
+
+FROM ${REGISTRY_MIRROR}/oven/bun:1.4.0 AS builder
+
+WORKDIR /build/web
+COPY web/package.json web/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY ./web ./
+COPY ./VERSION /build/VERSION
+RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat /build/VERSION) bun run build
+
+FROM ${REGISTRY_MIRROR}/library/golang:1.26.1-alpine AS builder2
+ENV GO111MODULE=on CGO_ENABLED=0 GOWORK=off
+
+ARG TARGETOS
+ARG TARGETARCH
+ENV GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64}
+ENV GOEXPERIMENT=greenteagc
+
+WORKDIR /build
+
+ADD go.mod go.sum ./
+# relaykit is a local submodule referenced via replace; its go.mod must be
+# present for go mod download to resolve the main module graph.
+ADD relaykit/go.mod ./relaykit/go.mod
+RUN go mod download
+
+COPY . .
+COPY --from=builder /build/web/dist ./web/dist
+RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
+
+FROM ${REGISTRY_MIRROR}/library/debian:bookworm-slim
+
+ARG APT_MIRROR
+
+# 换用可达的 Debian 源；同时兼容 deb822(debian.sources) 与经典 sources.list
+RUN set -eux; \
+    if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+      sed -i "s|deb.debian.org|${APT_MIRROR}|g; s|security.debian.org|${APT_MIRROR}|g" \
+        /etc/apt/sources.list.d/debian.sources; \
+    fi; \
+    if [ -f /etc/apt/sources.list ]; then \
+      sed -i "s|deb.debian.org|${APT_MIRROR}|g; s|security.debian.org|${APT_MIRROR}|g" \
+        /etc/apt/sources.list; \
+    fi; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget; \
+    rm -rf /var/lib/apt/lists/*; \
+    update-ca-certificates
+
+COPY --from=builder2 /build/new-api /
+COPY LICENSE NOTICE THIRD-PARTY-LICENSES.md /licenses/
+EXPOSE 3000
+WORKDIR /data
+ENTRYPOINT ["/new-api"]

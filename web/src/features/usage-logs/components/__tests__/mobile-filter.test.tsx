@@ -180,7 +180,13 @@ it('keeps all quick actions visible without opening a menu', async () => {
   await user.click(screen.getByRole('button', { name: 'Hide' }))
   expect(screen.getByRole('button', { name: 'Show' })).toBeVisible()
   screen.getByRole('button', { name: 'Show' }).focus()
-  for (const name of ['Filter', 'Search', 'View']) {
+  for (const name of [
+    'Refresh usage logs',
+    'Refresh settings',
+    'Filter',
+    'Search',
+    'View',
+  ]) {
     await user.tab()
     expect(screen.getByRole('button', { name })).toHaveFocus()
   }
@@ -234,14 +240,14 @@ it('collapses only date and statistics while keeping the right-hand quick action
     screen
       .getByRole('button', { name: /^\d{4}-\d{2}/ })
       .getAttribute('aria-label') ?? ''
-  expect(await screen.findByText('Usage')).toBeVisible()
+  expect(await screen.findByText('Tokens')).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Collapse' }))
   expect(screen.getByRole('button', { name: 'Expand' })).toHaveAttribute(
     'aria-expanded',
     'false'
   )
   expect(screen.queryByRole('button', { name: date })).not.toBeInTheDocument()
-  expect(screen.queryByText('Usage')).not.toBeInTheDocument()
+  expect(screen.queryByText('Tokens')).not.toBeInTheDocument()
   const actions = screen.getByRole('group', { name: 'Actions' })
   for (const name of ['Hide', 'Filter', 'Search', 'View']) {
     expect(within(actions).getByRole('button', { name })).toBeVisible()
@@ -255,7 +261,7 @@ it('collapses only date and statistics while keeping the right-hand quick action
     'true'
   )
   expect(screen.getByRole('button', { name: date })).toBeVisible()
-  expect(await screen.findByText('Usage')).toBeVisible()
+  expect(await screen.findByText('Tokens')).toBeVisible()
 })
 
 it.each([

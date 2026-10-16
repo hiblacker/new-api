@@ -33,6 +33,11 @@ import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { OverviewDashboard } from '../overview-dashboard'
 
+vi.mock('@visactor/react-vchart', () => ({ VChart: () => null }))
+vi.mock('@visactor/vchart', () => ({
+  ThemeManager: { setCurrentTheme: vi.fn() },
+}))
+
 const storageKey = 'dashboard_overview_setup_guide_expanded'
 let client: QueryClient
 let keyLookupError: Error | null
@@ -53,6 +58,11 @@ beforeEach(() => {
   })
   keyLookupError = null
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
+    if (url === '/api/user/self') {
+      return {
+        data: { success: true, data: useAuthStore.getState().auth.user },
+      }
+    }
     switch (url) {
       case '/api/token/?p=1&size=10':
         if (keyLookupError) throw keyLookupError
@@ -79,6 +89,13 @@ beforeEach(() => {
         return { data: { success: true, data: ['gpt-4o-mini'] } }
       case '/api/data/self':
         return { data: { success: true, data: [] } }
+      case '/api/log/self/stat?':
+        return {
+          data: {
+            success: true,
+            data: { quota: 0, rpm: 0, tpm: 0, token: 0 },
+          },
+        }
       default:
         throw new Error(`Unexpected dashboard request: ${url}`)
     }

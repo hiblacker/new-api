@@ -1,0 +1,295 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth-store'
+import { useSystemConfigStore } from '@/stores/system-config-store'
+
+import { SummaryCards } from '../summary-cards'
+
+// Two hourly buckets whose token totals must be summed for the window card.
+// Values are large enough that an abbreviated format would add a unit suffix.
+const WINDOW_ROWS = [
+  { created_at: 1_700_000_000, token_used: 120_000, quota: 10, count: 1 },
+  { created_at: 1_700_003_600, token_used: 340_000, quota: 20, count: 2 },
+]
+
+const LIFETIME_TOKENS = 1_234_567
+
+let client: QueryClient
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 9, 15, 12, 34, 56))
+  window.localStorage.clear()
+  useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
+  useAuthStore.getState().auth.setUser({
+    id: 1,
+    username: 'summary-user',
+    role: 1,
+    quota: 1_000_000,
+    used_quota: 12_345,
+    request_count: 678,
+  })
+  client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+
+  vi.spyOn(api, 'get').mockImplementation(async (url) => {
+    if (url === '/api/user/self') {
+      return {
+        data: { success: true, data: useAuthStore.getState().auth.user },
+      }
+    }
+    if (url === '/api/data/self') {
+      return { data: { success: true, data: WINDOW_ROWS } }
+    }
+    if (url.startsWith('/api/log/self/stat')) {
+      return {
+        data: {
+          success: true,
+          data: { quota: 0, rpm: 0, tpm: 0, token: LIFETIME_TOKENS },
+        },
+      }
+    }
+    if (url === '/api/status') {
+      return { data: { data: { display_in_currency: false } } }
+    }
+    throw new Error(`Unexpected summary cards request: ${url}`)
+  })
+})
+
+afterEach(() => {
+  cleanup()
+  client.clear()
+  useAuthStore.setState(useAuthStore.getInitialState(), true)
+  useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
+  window.localStorage.clear()
+  vi.restoreAllMocks()
+  vi.useRealTimers()
+})
+
+function renderSummaryCards() {
+  return render(
+    <QueryClientProvider client={client}>
+      <SummaryCards />
+    </QueryClientProvider>
+  )
+}
+
+/** The usage logs page renders the cards without the panel frame. */
+function renderBareSummaryCards() {
+  return render(
+    <QueryClientProvider client={client}>
+      <SummaryCards bare />
+    </QueryClientProvider>
+  )
+}
+
+function todayStart(expectedNow: number): number {
+  const date = new Date(expectedNow * 1000)
+  date.setHours(0, 0, 0, 0)
+  return Math.floor(date.getTime() / 1000)
+}
+
+/**
+ * The trend line drawn inside a card, located through its title. `group` is the
+ * stable Tailwind marker on the StatCard root; the sparkline is the last svg in
+ * the card and its second path is the line (the first one is the fill).
+ */
+function sparklinePathFor(title: string): string | null {
+  const root = screen.getByText(title).closest('.group')
+  if (!root) return null
+
+  const sparkline = [...root.querySelectorAll('svg')].at(-1)
+  if (!sparkline) return null
+
+  // The first path is the area fill, the second one is the trend line.
+  return (
+    [...sparkline.querySelectorAll('path')].at(1)?.getAttribute('d') ?? null
+  )
+}
+
+describe('overview summary cards', () => {
+  it('renders the token, usage and request cards without the removed credit panel', async () => {
+    renderSummaryCards()
+
+    expect(await screen.findByText('Token Usage')).toBeInTheDocument()
+    expect(screen.getByText('Historical Usage')).toBeInTheDocument()
+    expect(screen.getByText('Request Count')).toBeInTheDocument()
+    expect(screen.getByText('Total Tokens')).toBeInTheDocument()
+
+    expect(screen.queryByText('Credit remaining')).not.toBeInTheDocument()
+    expect(screen.queryByText('Runway')).not.toBeInTheDocument()
+  })
+
+  it('renders the all-time token total ahead of the windowed token card', async () => {
+    renderSummaryCards()
+
+    const titles = [
+      'Total Tokens',
+      'Token Usage',
+      'Historical Usage',
+      'Request Count',
+    ]
+    const nodes = await Promise.all(
+      titles.map((title) => screen.findByText(title))
+    )
+
+    for (let index = 1; index < nodes.length; index += 1) {
+      expect(
+        nodes[index - 1].compareDocumentPosition(nodes[index]) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy()
+    }
+  })
+
+  it('leaves the other cards trends untouched when the switcher moves', async () => {
+    const user = userEvent.setup()
+    const now = Math.floor(Date.now() / 1000)
+    const today = todayStart(now)
+
+    vi.mocked(api.get).mockImplementation(async (_url, config) => {
+      const start =
+        (config as { params?: { start_timestamp?: number } } | undefined)
+          ?.params?.start_timestamp ?? 0
+      const isToday = Math.abs(start - today) < 120
+      return {
+        data: {
+          success: true,
+          data: isToday
+            ? [{ created_at: now, token_used: 999, quota: 1, count: 9 }]
+            : [
+                {
+                  created_at: now - 20 * 3600,
+                  token_used: 1,
+                  quota: 5,
+                  count: 1,
+                },
+                {
+                  created_at: now - 10 * 3600,
+                  token_used: 2,
+                  quota: 5,
+                  count: 2,
+                },
+                { created_at: now, token_used: 3, quota: 5, count: 3 },
+              ],
+        },
+      }
+    })
+
+    renderSummaryCards()
+
+    // Wait for today's data before capturing the other cards' trends.
+    expect(await screen.findByText('999')).toBeInTheDocument()
+    const before = sparklinePathFor('Request Count')
+    expect(before).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Last 24 hours' }))
+
+    // Wait for the trailing-24h total (1 + 2 + 3 tokens) before checking
+    // the other cards.
+    expect(await screen.findByText('6')).toBeInTheDocument()
+
+    // Only the windowed token card follows the switcher, so the request card
+    // keeps drawing the very same trailing-24h trend.
+    expect(sparklinePathFor('Request Count')).toBe(before)
+  })
+
+  it('sums the window token usage across hourly buckets', async () => {
+    renderSummaryCards()
+
+    // 120000 + 340000 from the two buckets, rendered as a full grouped number.
+    expect(await screen.findByText(/^460[.,\s]?000$/)).toBeInTheDocument()
+  })
+
+  it('shows the all-time token total from the log statistics endpoint', async () => {
+    renderSummaryCards()
+
+    // Full digits, never an abbreviated unit such as "1.2M".
+    expect(
+      await screen.findByText(/^1[.,\s]?234[.,\s]?567$/)
+    ).toBeInTheDocument()
+  })
+
+  it('defaults to today and switches to the last 24 hours on click', async () => {
+    const user = userEvent.setup()
+    renderSummaryCards()
+
+    const last24h = await screen.findByRole('button', {
+      name: 'Last 24 hours',
+    })
+    const today = screen.getByRole('button', { name: 'Today' })
+    expect(today).toHaveAttribute('aria-pressed', 'true')
+    expect(last24h).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(last24h)
+
+    expect(last24h).toHaveAttribute('aria-pressed', 'true')
+    expect(today).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(today)
+
+    expect(today).toHaveAttribute('aria-pressed', 'true')
+    expect(last24h).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('requests today from local midnight through the end of day by default', async () => {
+    renderSummaryCards()
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/api/data/self', {
+        params: {
+          start_timestamp: Math.floor(new Date(2026, 9, 15).getTime() / 1000),
+          end_timestamp: Math.floor(
+            new Date(2026, 9, 15, 23, 59, 59).getTime() / 1000
+          ),
+          default_time: 'hour',
+        },
+      })
+    })
+  })
+
+  it('abbreviates the all-time token total beside the card title', async () => {
+    renderSummaryCards()
+
+    // 1,234,567 abbreviated with the dashboard cards' unit conversion.
+    expect(await screen.findByText('1.2M')).toBeInTheDocument()
+    // The full grouped figure stays as the card value.
+    expect(screen.getByText(/^1[.,\s]?234[.,\s]?567$/)).toBeInTheDocument()
+  })
+
+  it('renders the cards without the panel frame when bare', async () => {
+    renderBareSummaryCards()
+
+    expect(await screen.findByText('Total Tokens')).toBeInTheDocument()
+    expect(screen.getByText('Historical Usage')).toBeInTheDocument()
+
+    // The usage logs page supplies its own layout, so neither the panel title
+    // nor its caption may show up there.
+    expect(screen.queryByText('Usage at a glance')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Monitor token usage and request volume')
+    ).not.toBeInTheDocument()
+  })
+})

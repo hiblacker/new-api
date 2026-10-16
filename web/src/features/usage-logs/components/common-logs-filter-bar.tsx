@@ -55,6 +55,7 @@ import {
   LogsFilterInput,
   LogsFilterToolbar,
 } from './logs-filter-toolbar'
+import { UsageLogsRefreshControls } from './usage-logs-refresh-controls'
 import { useLogsViewScope, useUsageLogsContext } from './usage-logs-provider'
 
 const route = getRouteApi('/_authenticated/usage-logs/$section')
@@ -318,6 +319,14 @@ export function CommonLogsFilterBar<TData>(
     </Tooltip>
   )
 
+  // Refresh shares the toolbar's action slot with the display toggles.
+  const actionStart = (
+    <>
+      {sensitiveToggle}
+      <UsageLogsRefreshControls />
+    </>
+  )
+
   const dateRangeFilter = (
     <LogsFilterField wide>
       <CompactDateTimeRangePicker
@@ -487,7 +496,7 @@ export function CommonLogsFilterBar<TData>(
       table={props.table}
       compactMobile
       stats={statsBar}
-      actionStart={sensitiveToggle}
+      actionStart={actionStart}
       primaryFilters={
         <>
           {dateRangeFilter}

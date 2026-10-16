@@ -410,6 +410,7 @@ For commercial licensing, please contact support@quantumnous.com
   --overview-accent-1: var(--chart-1);
   --overview-accent-2: var(--chart-2);
   --overview-accent-3: var(--chart-3);
+  --overview-accent-4: var(--chart-4);
 }
 
 /* ── Semantic surface bridge ──────────────────────────────────────────── */

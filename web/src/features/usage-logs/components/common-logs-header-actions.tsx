@@ -31,8 +31,8 @@ import { useUsageLogsContext } from './usage-logs-provider'
 
 /**
  * Page-header actions for the Common Logs view: live usage stats plus a
- * toggle for masking sensitive values (token names, usernames, group names,
- * and the quota figure shown in stats). Both controls live in the page
+ * toggle for masking sensitive values (token names, usernames and group
+ * names). Both controls live in the page
  * header so the toolbar below stays focused on filter inputs and form
  * actions only.
  */
