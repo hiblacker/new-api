@@ -21,7 +21,6 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
-import { SystemUpdateAction } from '@/features/system-update/system-update-action'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
 
@@ -115,8 +114,6 @@ export function AppHeader({
     <Header>
       <div className='@container/system-brand flex min-w-0 flex-1 items-center gap-1'>
         <SystemBrand variant='inline' />
-        {/* 定制：标题栏不显示版本号（版本串对用户无参考价值） */}
-        <SystemUpdateAction />
       </div>
 
       {leftContent ? (

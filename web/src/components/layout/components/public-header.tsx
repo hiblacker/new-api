@@ -27,7 +27,6 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { SystemUpdateAction } from '@/features/system-update/system-update-action'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
@@ -234,8 +233,6 @@ export function PublicHeader(props: PublicHeaderProps) {
                   )}
                 </span>
               </Link>
-              {/* 定制：标题栏不显示版本号（版本串对用户无参考价值） */}
-              <SystemUpdateAction />
             </div>
 
             {/* Desktop nav */}

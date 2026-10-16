@@ -177,17 +177,18 @@ bun run build && cd .. && go build ./...
 
 ---
 
-## 8. 标题栏不显示版本号（2026-10-16）
+## 8. 顶栏不再显示更新检查入口（2026-10-16）
 
 - `components/layout/components/app-header.tsx`（应用顶栏）与
   `components/layout/components/public-header.tsx`（公开页顶栏）：
-  `<SystemUpdateAction presentation='version' />` → `<SystemUpdateAction />`，
-  即从「版本号」表现回到默认的 `action` 表现（图标 + 「检查更新／有可用更新」文案）。
-- 原因：rc.37 起该入口会在标题栏渲染当前版本号，版本串对用户无参考价值。
-- **只改了调用处**：组件 `features/system-update/system-update-action.tsx` 的
-  `presentation='version'` 实现与其测试（5 处 trigger 版本断言）**保持上游原样**，
-  因此升级上游时这 2 行需重新应用（若上游改了这两个 header 的调用方式需人工确认）。
-- rc.37 的更新检查能力保留：点图标仍可打开更新弹窗，系统设置 → 维护 → 更新检查 亦可用。
+  **移除** `<SystemUpdateAction />` 及其 import。
+  （rc.37 起该入口会在顶栏渲染当前版本号，版本串对用户无参考价值，
+  最终选择连同入口一起从顶栏去掉。）
+- **系统维护里的更新检查完整保留**：
+  `features/system-settings/maintenance/update-checker-section.tsx` 仍使用
+  `<SystemUpdateAction compact={false} />`（系统设置 → 维护 → 更新检查）。
+- 组件 `features/system-update/**` 与其测试**完全保持上游原样**未改，
+  因此升级上游时只需重放这两个 header 的删除（若上游改了这两个 header 需人工确认）。
 
 ### 相关：构建期版本戳（部署侧，非产品定制）
 
