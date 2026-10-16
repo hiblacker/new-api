@@ -1,12 +1,21 @@
 # 本仓库相对上游的定制
 
 - **上游**：https://github.com/QuantumNous/new-api
-- **基线 tag**：`v1.0.0-rc.36`
-- **分支**：`custom/rc36-token-stats`
-- **改动范围**：见 `git log --oneline custom/rc36-token-stats`
-- **数据库变更**：**无**（未动 `model/`、`setting/`、`service/`、`main.go`）
+- **基线 tag**：`v1.0.0-rc.37`（2026-10-16 由 `v1.0.0-rc.36` 升级合并，分叉点 `ea7cb0ba4`）
+- **分支**：`main`（定制已并入主分支；`custom/rc36-token-stats` 保留为历史特性分支）
+- **改动范围**：本文档 §1–§6；rc.36 → rc.37 的合并与冲突解决记录见合并提交 message
+- **数据库变更**：**定制代码本身无** schema 变更（未动 `model/`、`setting/`、`service/`、`main.go`）；
+  但**基线升级到 rc.37 会执行上游迁移**，见下方警告
 
-> 因为没有任何 schema 变更，升级或回滚镜像时**不需要迁移数据**。
+> **定制代码本身**没有任何 schema 变更，历史上在 rc.36 上回滚镜像不需要迁移数据。
+>
+> ⚠️ **2026-10-16 起基线升到 rc.37，这个结论变了**：rc.37 引入了显式迁移并会在启动时自动执行 ——
+> `model/option_primary_key_migration.go`（重建 options 表主键）、
+> `model/prefill_group_migration.go`（重命名 prefill group 唯一索引）、
+> `model/migration_dialector.go`（方言适配）。
+>
+> ⇒ **首次部署 rc.37 镜像前必须确认数据库备份成功**；一旦迁移已执行，
+> 再回滚到 rc.36 镜像**不一定安全**（schema 已前滚），需要时用 `deploy/backups/` 里的 pg 备份还原。
 
 ---
 
