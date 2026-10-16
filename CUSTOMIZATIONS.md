@@ -42,6 +42,9 @@
 - `features/dashboard/lib/token-usage.ts`
   纯逻辑层：粒度规则、`hour/day/week/month` 分桶、`axisStartFor`（全部时间至少覆盖近半年）、
   设置的 localStorage 持久化与校验。
+- `i18n/locales/zh.json`、`zh-TW.json`：`Usage Logs` / `Usage logs` 两个键的中文文案
+  由「使用日志」改为「使用记录」（繁体「使用紀錄」）。**只改中文**；菜单、个人资料页
+  「边栏模块」开关、概览页快捷入口共用同一个 key，会一起变（英文仍为 Usage Logs）。
 
 ### 粒度规则（易被上游改坏，务必核对）
 
@@ -122,6 +125,8 @@ bun run build && cd .. && go build ./...
 - [ ] 选「全部」→ 默认月聚合、X 轴覆盖近半年
 - [ ] 7 天 → 30 天切换后粒度是「天」而非「小时」
 - [ ] 筛选弹窗粒度下拉显示中文（小时/天/周/月），不是 `day`
+- [ ] 中文界面左侧菜单是「使用记录」（英文仍是 Usage Logs）
+- [ ] 使用日志（Common）页点刷新，或等自动刷新（默认 30 秒）后，**四张卡片数值都跟着变**
 
 ---
 
@@ -139,7 +144,11 @@ bun run build && cd .. && go build ./...
   - `features/dashboard/components/overview/overview-refresh-controls.tsx`：
     `dashboard/overview/*`、`status`、`perf-metrics-summary`
   - `features/usage-logs/components/usage-logs-refresh-controls.tsx`：`logs`、`usage-logs-stats`、
-    `dashboard/overview/*`（该页复用了概览卡片）、`status`
+    `status`，外加**四张头部卡片各自的前缀**——`dashboard/overview/account`（历史使用情况、请求计数）、
+    `dashboard/overview/summary-sparklines`（Token 用量）、`dashboard/overview/lifetime-tokens`（Token 总计）。
+    逐条列出而不写宽的 `dashboard/overview` 前缀，免得以后概览页新增查询被悄悄带进刷新范围。
+    回归测试 `features/usage-logs/__tests__/refresh.test.tsx` 断言**手动刷新与定时刷新后
+    四张卡片的渲染数值都变化**（把范围缩到只剩 `logs` 会立刻失败）
 - 位置：概览页在页面标题右侧的 Actions；使用日志页在筛选工具栏右侧的操作区
   （Common 与绘图／任务两套工具栏都挂了，走 `LogsFilterToolbar.actionStart`）。
 - `hooks/use-overview-account.ts`：概览页统一取当前账号（`/api/user/self` 兜底 auth store）。
