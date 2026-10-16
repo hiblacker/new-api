@@ -174,3 +174,24 @@ bun run build && cd .. && go build ./...
 `formatChartTime(ts, 'week')` 依据每条数据自身日期生成标签，同周不同天会各自成柱。
 后端也完全忽略 `default_time` 参数。本仓库的 Token 用量图**没有**复制该问题
 （做了对齐到周一的正确分桶）。**选择：不修上游，保持改动最小。**
+
+---
+
+## 8. 标题栏不显示版本号（2026-10-16）
+
+- `components/layout/components/app-header.tsx`（应用顶栏）与
+  `components/layout/components/public-header.tsx`（公开页顶栏）：
+  `<SystemUpdateAction presentation='version' />` → `<SystemUpdateAction />`，
+  即从「版本号」表现回到默认的 `action` 表现（图标 + 「检查更新／有可用更新」文案）。
+- 原因：rc.37 起该入口会在标题栏渲染当前版本号，版本串对用户无参考价值。
+- **只改了调用处**：组件 `features/system-update/system-update-action.tsx` 的
+  `presentation='version'` 实现与其测试（5 处 trigger 版本断言）**保持上游原样**，
+  因此升级上游时这 2 行需重新应用（若上游改了这两个 header 的调用方式需人工确认）。
+- rc.37 的更新检查能力保留：点图标仍可打开更新弹窗，系统设置 → 维护 → 更新检查 亦可用。
+
+### 相关：构建期版本戳（部署侧，非产品定制）
+
+上游 `VERSION` 是空文件（`f4450040b`），真实版本由 CI 在构建时写入。
+本地构建若不处理，`/api/status` 的 `version` 为空、更新弹窗会显示「未知版本」。
+`deploy/nas.sh` 现在会在构建前把镜像 tag 写进 `VERSION`、构建后（含中断）还原，
+详见 `deploy/README.md`。

@@ -234,7 +234,8 @@ export function PublicHeader(props: PublicHeaderProps) {
                   )}
                 </span>
               </Link>
-              <SystemUpdateAction presentation='version' />
+              {/* 定制：标题栏不显示版本号（版本串对用户无参考价值） */}
+              <SystemUpdateAction />
             </div>
 
             {/* Desktop nav */}

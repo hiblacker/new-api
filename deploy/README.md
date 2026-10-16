@@ -92,6 +92,12 @@ docker pull docker.m.daocloud.io/library/debian:bookworm-slim
 6. 记录回滚镜像、备份 PostgreSQL、载入新镜像并重建应用容器。
 7. 检查 `/api/status`；新版本不健康时自动回滚。
 
+> **构建期版本戳**：上游的 `VERSION` 是**空文件**，真实版本由上游 CI 在构建时写入
+> （`docker-build.yml`: `echo "${TAG}" > VERSION`）。本地构建没人写它，
+> 会导致 `/api/status` 的 `version` 为空、界面显示「未知版本」。
+> `nas.sh` 会在 `docker build` 前把镜像 tag 临时写进 `VERSION`，
+> 构建后（含 `EXIT/INT/TERM` 中断）还原为原来的 0 字节，工作区保持干净。
+
 ## 日常操作
 
 ```bash
