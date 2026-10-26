@@ -26,7 +26,8 @@ COPY ./VERSION /build/VERSION
 RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat /build/VERSION) bun run build
 
 FROM ${REGISTRY_MIRROR}/library/golang:1.26.1-alpine AS builder2
-ENV GO111MODULE=on CGO_ENABLED=0 GOWORK=off
+# 构建期固定走国内模块代理：构建容器拿不到宿主代理，proxy.golang.org 会直接超时。
+ENV GO111MODULE=on CGO_ENABLED=0 GOWORK=off GOPROXY=https://goproxy.cn,direct
 
 ARG TARGETOS
 ARG TARGETARCH
