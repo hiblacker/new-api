@@ -136,6 +136,8 @@ bun run build && cd .. && go build ./...
 - [ ] 筛选弹窗粒度下拉显示中文（小时/天/周/月），不是 `day`
 - [ ] 中文界面左侧菜单是「使用记录」（英文仍是 Usage Logs）
 - [ ] 使用日志（Common）页点刷新，或等自动刷新（默认 30 秒）后，**四张卡片数值都跟着变**
+- [ ] 系统设置 → 维护 → 日志维护 有「记录用户提问」开关与字符数输入，开关默认关闭
+- [ ] 打开开关后发一条文本请求，使用记录详情弹窗出现「用户提问」区块，且普通用户视角看不到
 
 ---
 
@@ -196,3 +198,48 @@ bun run build && cd .. && go build ./...
 本地构建若不处理，`/api/status` 的 `version` 为空、更新弹窗会显示「未知版本」。
 `deploy/nas.sh` 现在会在构建前把镜像 tag 写进 `VERSION`、构建后（含中断）还原，
 详见 `deploy/README.md`。
+
+---
+
+## 9. 使用记录展示用户提问（2026-10-23）
+
+### 后端
+- `service/log_prompt.go`（新增）：`extractPromptText` 按协议从 `relayInfo.Request` 取**最后一条
+  `role=user` 消息**的文本 —— OpenAI Chat／补全、Claude、Gemini、Responses、图片 `prompt`、
+  Embedding `input`、Rerank `query`。图片／音频等附件一律丢弃，只保留 text part（防止 base64 进库）。
+- `service/log_info_generate.go`：`GenerateTextOtherInfo()` 调用 `appendPromptPreview()`。该函数是
+  文本／Claude／Gemini／音频／WSS／图片／Embedding／Rerank 计费成功日志的唯一漏斗，一处覆盖全部。
+- `service/relay_error.go`：`ProcessChannelError` 的失败日志也挂一次。
+- `cleanUserText`：截断前先剥离客户端注入的脚手架（`<system-reminder>`、`<image_local_path>`、
+  `<codex_internal_context>`，并去掉 `<user_query>` 包裹）；Codex goal 模式消息没有用户正文，
+  退回取 `<objective>` 内容；清洗后为空则不写预览。
+- 落库位置：`other.admin_info.prompt_preview` + `other.admin_info.prompt_chars`（**admin 作用域**，
+  `model.formatUserLogs` 会把 `admin_info` 整块从普通用户视图剥离）。按 rune 截断，超长补 `…`。
+- 开关：`LogPromptEnabled`（默认 **false**）、`LogPromptMaxChars`（默认 500，硬上限 4000），
+  注册在 `common/constants.go` 与 `model/option.go`。
+
+### 前端
+- `features/usage-logs/components/dialogs/details-dialog.tsx`：详情弹窗新增「User Prompt」区块
+  （等宽换行 + 复制按钮 + 截断提示）。
+- `features/system-settings/maintenance/log-settings-section.tsx`：日志维护页新增开关与字符数输入
+  （`zodResolver` 需 `as Resolver<Values, unknown, Values>`，否则 `z.coerce.number` 会破坏泛型推导）。
+- `features/usage-logs/types.ts`：`LogOtherData.admin_info` 增加 `prompt_preview` / `prompt_chars`。
+- i18n：7 个 locale 各新增 6 个 key。
+
+### 测试
+- `service/log_prompt_test.go`：表驱动覆盖各协议、tool 消息回退、多模态丢附件、rune 截断、开关关闭。
+- `web/src/features/usage-logs/components/__tests__/prompt-preview.test.tsx`：详情弹窗三条用例。
+
+### 注意
+- 开启后列表接口的 `other` 会变大（每条 ≤ `LogPromptMaxChars`），是已知取舍；要存全文需另立表
+  （见 `docs/usage-log-prompt-design.md` 方案 B）。
+- `pass-through` 直传、JS 任务插件、MJ 任务、异步结算路径拿不到结构化请求，记录不到，属预期。
+- ClickHouse 日志库无 schema 变更（仍写 `other` 字符串列）。
+
+### 构建 / 部署（2026-10-23 补充）
+- `Dockerfile` 的 `builder2` 阶段 `ENV` 追加 `GOPROXY=https://goproxy.cn,direct`；
+  `deploy/Dockerfile.mirror` 同步同一改动。原因：`docker build` 的容器拿不到宿主代理，
+  默认 `proxy.golang.org` 直连超时，`go mod download` 必挂。
+- 部署前自检：`docker images | grep -E 'debian|golang|oven/bun'` 三个基础镜像必须都在本地，
+  否则构建会去连 Docker Hub。2026-10-23 曾因本地缓存被清空、`debian:bookworm-slim` 缺失而失败，
+  最终用 `docker pull docker.1ms.run/library/debian:bookworm-slim` + `docker tag` 成官方名解决。

@@ -49,6 +49,7 @@ import {
   UserCog,
   Info,
   LogIn,
+  MessageSquare,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -501,6 +502,8 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const showAdminIp =
     !!props.log.ip && (showTiming || (props.isAdmin && isTopup))
   const adminInfo = other?.admin_info
+  const promptPreview = adminInfo?.prompt_preview ?? ''
+  const promptChars = adminInfo?.prompt_chars ?? 0
   const topupAuditFields =
     isTopup && props.isAdmin && adminInfo
       ? ([
@@ -746,6 +749,41 @@ export function DetailsDialog(props: DetailsDialogProps) {
             />
           )}
         </div>
+
+        {/* User prompt preview (admin only, written opt-in by the backend) */}
+        {promptPreview !== '' && (
+          <DetailSection
+            icon={<MessageSquare className='size-3.5' aria-hidden='true' />}
+            label={t('User Prompt')}
+          >
+            <div className='relative min-w-0'>
+              <Button
+                variant='ghost'
+                size='sm'
+                className='absolute top-0 right-0 h-5 w-5 p-0'
+                onClick={() => copyToClipboard(promptPreview)}
+                title={t('Copy to clipboard')}
+                aria-label={t('Copy to clipboard')}
+              >
+                {copiedText === promptPreview ? (
+                  <Check className='size-3 text-green-600' />
+                ) : (
+                  <Copy className='size-3' />
+                )}
+              </Button>
+              <pre className='bg-muted/50 max-h-40 max-w-full min-w-0 overflow-auto rounded-md border p-2 pr-7 font-sans text-xs break-all whitespace-pre-wrap'>
+                {promptPreview}
+              </pre>
+              {promptChars > promptPreview.length && (
+                <p className='text-muted-foreground mt-1 text-xs'>
+                  {t('Prompt truncated (original {{chars}} characters)', {
+                    chars: promptChars,
+                  })}
+                </p>
+              )}
+            </div>
+          </DetailSection>
+        )}
 
         {/* Request conversion (admin only, not for refund) */}
         {showConversion && (

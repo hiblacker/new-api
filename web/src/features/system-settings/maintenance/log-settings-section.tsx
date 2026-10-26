@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import * as z from 'zod'
@@ -85,12 +85,16 @@ import type { LogCleanupTask } from '../types'
 
 const logSettingsSchema = z.object({
   LogConsumeEnabled: z.boolean(),
+  LogPromptEnabled: z.boolean(),
+  LogPromptMaxChars: z.coerce.number().int().min(100).max(4000),
 })
 
 type LogSettingsFormValues = z.infer<typeof logSettingsSchema>
 
 type LogSettingsSectionProps = {
   defaultEnabled: boolean
+  defaultPromptEnabled: boolean
+  defaultPromptMaxChars: number
 }
 
 type ServerLogInfo = {
@@ -146,13 +150,21 @@ function isActiveLogCleanupTask(task: LogCleanupTask | null) {
 
 export function LogSettingsSection({
   defaultEnabled,
+  defaultPromptEnabled,
+  defaultPromptMaxChars,
 }: LogSettingsSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
   const form = useForm<LogSettingsFormValues>({
-    resolver: zodResolver(logSettingsSchema),
+    resolver: zodResolver(logSettingsSchema) as Resolver<
+      LogSettingsFormValues,
+      unknown,
+      LogSettingsFormValues
+    >,
     defaultValues: {
       LogConsumeEnabled: defaultEnabled,
+      LogPromptEnabled: defaultPromptEnabled,
+      LogPromptMaxChars: defaultPromptMaxChars,
     },
   })
 
@@ -180,8 +192,12 @@ export function LogSettingsSection({
   }, [])
 
   useEffect(() => {
-    form.reset({ LogConsumeEnabled: defaultEnabled })
-  }, [defaultEnabled, form])
+    form.reset({
+      LogConsumeEnabled: defaultEnabled,
+      LogPromptEnabled: defaultPromptEnabled,
+      LogPromptMaxChars: defaultPromptMaxChars,
+    })
+  }, [defaultEnabled, defaultPromptEnabled, defaultPromptMaxChars, form])
 
   useEffect(() => {
     fetchServerLogInfo()
@@ -263,11 +279,24 @@ export function LogSettingsSection({
   }, [logCleanupActive, logCleanupTaskId, t])
 
   const onSubmit = async (values: LogSettingsFormValues) => {
-    if (values.LogConsumeEnabled === defaultEnabled) return
-    await updateOption.mutateAsync({
-      key: 'LogConsumeEnabled',
-      value: values.LogConsumeEnabled,
-    })
+    if (values.LogConsumeEnabled !== defaultEnabled) {
+      await updateOption.mutateAsync({
+        key: 'LogConsumeEnabled',
+        value: values.LogConsumeEnabled,
+      })
+    }
+    if (values.LogPromptEnabled !== defaultPromptEnabled) {
+      await updateOption.mutateAsync({
+        key: 'LogPromptEnabled',
+        value: values.LogPromptEnabled,
+      })
+    }
+    if (values.LogPromptMaxChars !== defaultPromptMaxChars) {
+      await updateOption.mutateAsync({
+        key: 'LogPromptMaxChars',
+        value: values.LogPromptMaxChars,
+      })
+    }
   }
 
   const handleRequestCleanLogs = () => {
@@ -372,6 +401,62 @@ export function LogSettingsSection({
               </SettingsSwitchItem>
             )}
           />
+
+          <FormField
+            control={form.control}
+            name='LogPromptEnabled'
+            render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent>
+                  <FormLabel>{t('Record user prompts')}</FormLabel>
+                  <FormDescription>
+                    {t(
+                      'Keep a truncated preview of the user prompt in usage logs. It is visible to administrators only.'
+                    )}
+                  </FormDescription>
+                </SettingsSwitchContent>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <FormMessage />
+              </SettingsSwitchItem>
+            )}
+          />
+
+          {form.watch('LogPromptEnabled') && (
+            <FormField
+              control={form.control}
+              name='LogPromptMaxChars'
+              render={({ field }) => (
+                <SettingsControlGroup className='space-y-2'>
+                  <div>
+                    <h4 className='text-sm font-medium'>
+                      {t('Prompt max chars')}
+                    </h4>
+                    <p className='text-muted-foreground text-sm'>
+                      {t(
+                        'Maximum characters stored per log entry. Longer prompts are truncated.'
+                      )}
+                    </p>
+                  </div>
+                  <Input
+                    type='number'
+                    min={100}
+                    max={4000}
+                    className='max-w-40'
+                    value={Number.isNaN(field.value) ? '' : field.value}
+                    onChange={(event) =>
+                      field.onChange(event.target.valueAsNumber)
+                    }
+                  />
+                  <FormMessage />
+                </SettingsControlGroup>
+              )}
+            />
+          )}
 
           <SettingsControlGroup className='space-y-3'>
             <div>

@@ -98,6 +98,8 @@ const OPERATIONS_SECTIONS = [
     build: (settings: OperationsSettings) => (
       <LogSettingsSection
         defaultEnabled={Boolean(settings.LogConsumeEnabled)}
+        defaultPromptEnabled={Boolean(settings.LogPromptEnabled)}
+        defaultPromptMaxChars={settings.LogPromptMaxChars}
       />
     ),
   },

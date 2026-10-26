@@ -93,6 +93,13 @@ var MemoryCacheEnabled bool
 
 var LogConsumeEnabled = true
 
+// LogPromptEnabled controls whether usage logs keep a truncated preview of the
+// user prompt. It defaults to false because the preview stores user content.
+var LogPromptEnabled = false
+
+// LogPromptMaxChars bounds the stored preview length in runes.
+var LogPromptMaxChars = 500
+
 var TLSInsecureSkipVerify bool
 var InsecureTLSConfig = &tls.Config{InsecureSkipVerify: true}
 

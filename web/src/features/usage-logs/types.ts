@@ -142,6 +142,10 @@ export interface LogOtherData {
       original: number
       clamped: number
     }
+    // Truncated preview of the user prompt (admin only, opt-in via system settings)
+    prompt_preview?: string
+    // Length of the original prompt in characters, used to flag truncation
+    prompt_chars?: number
     // Reject / intercept reason (admin only)
     reject_reason?: string
     task_plugin?: TaskPluginInfo

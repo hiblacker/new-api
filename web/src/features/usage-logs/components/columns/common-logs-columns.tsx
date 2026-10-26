@@ -344,6 +344,46 @@ export function useCommonLogsColumns(
   const { t } = useTranslation()
   const columns: ColumnDef<UsageLog>[] = [
     {
+      id: 'prompt',
+      header: t('User Prompt'),
+      accessorFn: (row) =>
+        parseLogOther(row.other)?.admin_info?.prompt_preview ?? '',
+      cell: function PromptCell({ row }) {
+        const [dialogOpen, setDialogOpen] = useState(false)
+        const log = row.original
+        const other = parseLogOther(log.other)
+        const promptPreview = other?.admin_info?.prompt_preview ?? ''
+
+        return (
+          <>
+            <button
+              type='button'
+              className='group flex max-w-[220px] items-center gap-1 text-left text-xs'
+              onClick={() => setDialogOpen(true)}
+              title={promptPreview || t('Click to view full details')}
+            >
+              {promptPreview ? (
+                <span className='truncate leading-snug group-hover:underline'>
+                  {promptPreview}
+                </span>
+              ) : (
+                <span className='text-muted-foreground/40'>—</span>
+              )}
+            </button>
+            <DetailsDialog
+              log={log}
+              isAdmin={isAdmin}
+              isRoot={isRoot}
+              open={dialogOpen}
+              onOpenChange={setDialogOpen}
+            />
+          </>
+        )
+      },
+      size: 220,
+      maxSize: 260,
+    },
+    {
       accessorKey: 'created_at',
       header: t('Time'),
       cell: ({ row }) => {
