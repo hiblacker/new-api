@@ -312,7 +312,7 @@ func InsertCodexUsageLogs(reqs []CodexUsageLogRequest, accountId string) (int, e
 			"provider":      "codex-subscription",
 			"account_id":    accountId,
 			"thread_id":     r.ThreadId,
-			"cached_tokens": r.CachedTokens,
+			"cache_tokens":  r.CachedTokens,
 			"total_tokens":  r.TotalTokens,
 		})
 		logs = append(logs, Log{
