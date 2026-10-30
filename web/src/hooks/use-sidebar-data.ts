@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   Activity,
   Box,
+  Bot,
   ClipboardList,
   CreditCard,
   FileText,
@@ -136,6 +137,12 @@ export function useSidebarData(): SidebarData {
             title: t('Channels'),
             url: '/channels',
             icon: Radio,
+          },
+          {
+            title: t('Codex Usage'),
+            url: '/codex-usage',
+            icon: Bot,
+            requiredRole: ROLE.ADMIN,
           },
           {
             title: t('Models'),
