@@ -256,6 +256,8 @@ type CodexUsageLogRequest struct {
 	CachedTokens     int    `json:"cached_tokens"`
 	TotalTokens      int    `json:"total_tokens"`
 	CreatedAt        int64  `json:"created_at"`
+	// Content 是这条请求所属那一轮的用户提问，用于「使用记录」里的提问列
+	Content string `json:"content"`
 }
 
 // InsertCodexUsageLogs 把 Codex 的单次请求写入 logs 表。
@@ -293,6 +295,13 @@ func InsertCodexUsageLogs(reqs []CodexUsageLogRequest, accountId string) (int, e
 			continue
 		}
 		if _, ok := existing[r.RequestId]; ok {
+			// 已入库但提问为空的，补上内容（早期版本没采集 content）
+			if r.Content != "" {
+				LOG_DB.Model(&Log{}).
+					Where("request_id = ? AND token_name = ? AND (content IS NULL OR content = '')",
+						r.RequestId, CodexUsageLogTokenName).
+					Update("content", r.Content)
+			}
 			continue
 		}
 		createdAt := r.CreatedAt
@@ -300,9 +309,9 @@ func InsertCodexUsageLogs(reqs []CodexUsageLogRequest, accountId string) (int, e
 			createdAt = time.Now().Unix()
 		}
 		other, _ := common.Marshal(map[string]any{
-			"provider":    "codex-subscription",
-			"account_id":  accountId,
-			"thread_id":   r.ThreadId,
+			"provider":      "codex-subscription",
+			"account_id":    accountId,
+			"thread_id":     r.ThreadId,
 			"cached_tokens": r.CachedTokens,
 			"total_tokens":  r.TotalTokens,
 		})
@@ -310,7 +319,7 @@ func InsertCodexUsageLogs(reqs []CodexUsageLogRequest, accountId string) (int, e
 			UserId:           0,
 			CreatedAt:        createdAt,
 			Type:             LogTypeConsume,
-			Content:          "",
+			Content:          r.Content,
 			Username:         CodexUsageLogUsername,
 			TokenName:        CodexUsageLogTokenName,
 			ModelName:        r.Model,
