@@ -340,6 +340,14 @@ func SetApiRouter(router *gin.Engine) {
 		dataRoute.GET("/flow", middleware.AdminAuth(), controller.GetAllFlowQuotaDates)
 		dataRoute.GET("/flow/self", middleware.UserAuth(), controller.GetUserFlowQuotaDates)
 
+		// Codex 官方订阅用量（由本机采集器推送，token 明细 + 额度快照）
+		codexUsageRoute := apiRouter.Group("/codex-usage")
+		codexUsageRoute.Use(middleware.AdminAuth())
+		{
+			codexUsageRoute.POST("/sync", controller.SyncCodexUsage)
+			codexUsageRoute.GET("/summary", controller.GetCodexUsageSummary)
+		}
+
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
 		{
 			logRoute.GET("/token", middleware.TokenAuthReadOnly(), controller.GetLogByKey)
